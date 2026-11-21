@@ -19,6 +19,22 @@ interface Props {
   num?: string;
 }
 const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
+
+/** Launch options → wrap-safe groups: each option stays with its value,
+ *  e.g. "-fullscreen", "+exec autoexec.cfg", "-allow_third_party_software". */
+const launchGroups = (s: string): string[] => {
+  const parts = s.trim().split(/\s+/);
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const flag = /^[-+]/.test(parts[i]);
+    const next = parts[i + 1];
+    if (flag && next !== undefined && !/^[-+]/.test(next)) {
+      out.push(`${parts[i]} ${next}`);
+      i++;
+    } else out.push(parts[i]);
+  }
+  return out;
+};
 ---
 
 <section class="section section--tint" id="settings" data-panel data-label="Settings" aria-labelledby="settings-title">
@@ -56,12 +72,13 @@ const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
           {t.id === "crosshair" ? (
             <div class="st__xh">
               <div class="st__xh-preview">
-                <CrosshairPreview {...crosshair} />
-                {crosshairCode && (
-                  <button class="btn btn--primary st__xh-copy" type="button" data-copy={crosshairCode} data-copy-msg="Crosshair code copied">
-                    <Icon name="copy" /> Copy crosshair code
-                  </button>
-                )}
+                <CrosshairPreview {...crosshair}>
+                  {crosshairCode && (
+                    <button slot="action" class="btn btn--primary btn--sm st__xh-copy" type="button" data-copy={crosshairCode} data-copy-msg="Crosshair code copied">
+                      <Icon name="copy" size={16} /> Copy crosshair code
+                    </button>
+                  )}
+                </CrosshairPreview>
               </div>
               <dl class="kv">
                 {t.rows.map((r) => (
@@ -77,7 +94,7 @@ const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
             </div>
           ) : t.id === "launch" && t.code ? (
             <div class="codeblock">
-              <pre><code>{t.code}</code></pre>
+              <pre><code>{launchGroups(t.code).map((g, i) => (<>{i > 0 && " "}<span class="codeblock__tok">{g}</span></>))}</code></pre>
               <button class="btn btn--ghost btn--sm codeblock__copy" type="button" data-copy={t.code} data-copy-msg="Launch options copied">
                 <Icon name="copy" size={16} /> Copy
               </button>
@@ -184,7 +201,7 @@ const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
   .kv__row {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center; /* label (Inter) and value (Share Tech Mono) have different metrics */
     gap: 16px;
     padding: 12px 2px;
     border-bottom: 1px solid var(--border);
@@ -195,23 +212,27 @@ const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-family: var(--font-pixel);
-    font-size: 0.9375rem;
+    font-family: var(--font-value);
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1.35;
     color: var(--cream);
     text-align: right;
   }
   .kv__bool {
     padding: 1px 8px;
     border-radius: 6px;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
     color: var(--text-muted);
     border: 1px solid var(--border-strong);
   }
   .kv__bool.is-on { color: var(--moon-red-text); border-color: rgba(232, 38, 59, 0.55); background: rgba(232, 38, 59, 0.08); }
   .kv__swatch { width: 14px; height: 14px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); }
   .kv__key {
-    font-family: var(--font-pixel);
-    font-size: 0.8125rem;
+    font-family: var(--font-value);
+    font-weight: 600;
+    font-size: 0.875rem;
     padding: 2px 8px;
     border-radius: 6px;
     border: 1px solid var(--border-strong);
@@ -240,21 +261,38 @@ const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
   }
 
   /* Code block */
+  /* Text wraps instead of scrolling, and the Copy button has its own space
+     (beside the text; below it on phones), so they can never overlap.
+     The button copies the exact one-line string from data-copy. */
   .codeblock {
-    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 8px 8px 0;
     border-radius: 10px;
     border: 1px solid var(--border);
     background: rgba(6, 7, 22, 0.7);
   }
   .codeblock pre {
+    flex: 1;
+    min-width: 0;
     margin: 0;
-    padding: 18px 20px;
-    padding-right: 96px;
-    overflow-x: auto;
+    padding: 10px 0 10px 20px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere; /* only splits a word if it's longer than the line */
     font: 0.9375rem/1.6 var(--font-mono);
     color: var(--cream);
   }
-  .codeblock__copy { position: absolute; top: 8px; right: 8px; }
+  /* each option stays in one piece ("-allow_third_party_software" never splits
+     at its dash); lines only break between options. An option longer than the
+     whole line may still split, so nothing ever overflows. */
+  .codeblock__tok { display: inline-block; max-width: 100%; }
+  .codeblock__copy { flex: none; }
+  @media (max-width: 479px) {
+    .codeblock { flex-direction: column; align-items: stretch; gap: 4px; padding: 8px; }
+    .codeblock pre { padding: 8px 8px 4px; }
+    .codeblock__copy { align-self: flex-end; }
+  }
 
   .st__foot {
     display: flex;

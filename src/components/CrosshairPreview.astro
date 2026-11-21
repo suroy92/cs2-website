@@ -98,6 +98,7 @@ const maps = (
 // The first map (Dust II) is the starting background, set on the server so it
 // shows immediately. With no images in the folder, the stage stays plain dark.
 const first = maps[0];
+const hasAction = Astro.slots.has("action");
 const firstStyle = first ? `--map:url("${first.full}");--map-w:${first.w};--map-h:${first.h}` : undefined;
 ---
 
@@ -120,8 +121,10 @@ const firstStyle = first ? `--map:url("${first.full}");--map-w:${first.w};--map-
     </svg>
     <span class="xh__zoom pixel" aria-hidden="true">Actual size</span>
   </div>
-  {maps.length > 1 && (
+  {(maps.length > 1 || hasAction) && (
   <figcaption class="xh__bar">
+    <slot name="action" />
+    {maps.length > 1 && (
     <div class="xh__swatches" role="group" aria-label="Preview background">
       {maps.map((m, i) => (
         <button
@@ -139,6 +142,7 @@ const firstStyle = first ? `--map:url("${first.full}");--map-w:${first.w};--map-
         </button>
       ))}
     </div>
+    )}
   </figcaption>
   )}
 </figure>
@@ -181,6 +185,7 @@ const firstStyle = first ? `--map:url("${first.full}");--map-w:${first.w};--map-
   }
   .xh__bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
     gap: 12px;
@@ -191,6 +196,7 @@ const firstStyle = first ? `--map:url("${first.full}");--map-w:${first.w};--map-
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 6px;
+    margin-left: auto; /* always on the right; an action button (if any) sits on the left */
   }
   .xh__sw {
     width: 28px;
