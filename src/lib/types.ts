@@ -14,7 +14,8 @@ export interface Profile {
   avatar: string;
   steamId64?: string;
   stats: { cs2Hours: number; steamLevel?: number; playingSince: number; apexHours?: number };
-  links: Partial<Record<LinkKey, string>>;
+  /** One URL, or a list for several accounts (first = main, the rest get an "Alt account" tag). */
+  links: Partial<Record<LinkKey, string | string[]>>;
   mouse: {
     dpi: number;
     sensitivity: number;

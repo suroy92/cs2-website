@@ -36,10 +36,17 @@ export const profile: Profile = {
     apexHours: 1517, // optional: "also played"
   },
 
+  // A list = several accounts. The first is the main one; the rest get an "Alt account" tag.
   links: {
-    steam: "https://steamcommunity.com/id/metronix9/",
-    csstats: "https://csstats.gg/player/76561197961132406",
-    youtube: "https://youtube.com/@TODO",
+    steam: [
+      "https://steamcommunity.com/id/metronix9/", // main
+      "https://steamcommunity.com/id/archion9/", // alt
+    ],
+    csstats: [
+      "https://csstats.gg/player/76561197961132406", // main
+      "https://csstats.gg/player/76561199173350861", // alt
+    ],
+    youtube: "https://www.youtube.com/@metronix9",
     // optional — add any of these and a link card appears:
     // faceit: "https://www.faceit.com/en/players/...",
     // leetify: "https://leetify.com/app/profile/...",
@@ -105,5 +112,5 @@ export const profile: Profile = {
 
   // Paste the 11-character ID from a YouTube URL:
   // https://www.youtube.com/watch?v=dQw4w9WgXcQ  →  id: "dQw4w9WgXcQ"
-  videos: [{ id: "YOUTUBE_VIDEO_ID", title: "TODO", description: "" }],
+  videos: [{ id: "5C09gmuuiVA", title: "CS 2 Highlights", description: "" }],
 };

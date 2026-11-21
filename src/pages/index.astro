@@ -160,7 +160,8 @@ const navItems = [
     grid-template-columns: 1fr;
   }
   @media (min-width: 640px) {
-    /* 2 links → 2 wide cards, 3+ → 3 columns; never an empty slot */
-    .link-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    /* two per row (same-type cards pair up: main + alt); an odd last card spans the row */
+    .link-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    .link-grid > :global(:last-child:nth-child(odd)) { grid-column: 1 / -1; }
   }
 </style>

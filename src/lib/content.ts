@@ -268,11 +268,21 @@ const prettyUrl = (u: string) => {
   return last ? decodeURIComponent(last) : url.hostname.replace(/^www\./, "");
 };
 
-export const links = (Object.keys(LINK_META) as LinkKey[])
-  .filter((k) => knownUrl(profile.links[k]))
-  .map((k) => ({ key: k, url: profile.links[k]!, ...LINK_META[k], display: prettyUrl(profile.links[k]!) }));
+/** All valid URLs for a link type. A list means several accounts: the first is the main one. */
+const urlsFor = (k: LinkKey): string[] => [profile.links[k] ?? []].flat().filter(knownUrl);
 
-export const youtubeUrl = knownUrl(profile.links.youtube) ? profile.links.youtube : null;
-export const steamUrl = knownUrl(profile.links.steam) ? profile.links.steam : null;
+/** One card per URL; same-type cards stay next to each other. Extra accounts get an "Alt account" tag. */
+export const links = (Object.keys(LINK_META) as LinkKey[]).flatMap((k) =>
+  urlsFor(k).map((url, i) => ({
+    key: k,
+    url,
+    label: LINK_META[k].label,
+    hint: i === 0 ? LINK_META[k].hint : "Alt account",
+    display: prettyUrl(url),
+  })),
+);
+
+export const youtubeUrl = urlsFor("youtube")[0] ?? null;
+export const steamUrl = urlsFor("steam")[0] ?? null; // main account (home screen button)
 
 export { profile };

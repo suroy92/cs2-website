@@ -79,7 +79,7 @@ const bg = await getBackground();
         alternateName: profile.displayName,
         description: [profile.bio].flat().join(" "),
         image: profile.avatar,
-        sameAs: Object.values(profile.links).filter((u) => u && !/todo/i.test(u)),
+        sameAs: Object.values(profile.links).flat().filter((u) => u && !/todo/i.test(u)),
       },
     })} />
   </head>
