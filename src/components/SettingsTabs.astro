@@ -121,7 +121,6 @@ const launchGroups = (s: string): string[] => {
       ))}
 
       <div class="st__foot">
-        <p class="muted st__foot-note">Values not listed are still being confirmed.</p>
         <button class="btn btn--ghost btn--sm" type="button" data-autoexec={autoexec} data-filename="autoexec.cfg">
           <Icon name="download" size={16} /> Download autoexec.cfg
         </button>
@@ -132,7 +131,23 @@ const launchGroups = (s: string): string[] => {
 </section>
 
 <style>
-  .st { padding: 8px; }
+  /* Tab bar on the left, Download autoexec.cfg on the right of the same row;
+     the active panel spans the full width underneath. */
+  .st {
+    padding: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .st__tablist-wrap { grid-column: 1; grid-row: 1; }
+  .st__foot { grid-column: 2; grid-row: 1; }
+  .st__panel { grid-column: 1 / -1; grid-row: 2; align-self: start; }
+  /* phones: not enough room beside the tabs, so the button gets its own row under them */
+  @media (max-width: 639px) {
+    .st__tablist-wrap { grid-column: 1 / -1; }
+    .st__foot { grid-column: 1 / -1; grid-row: 2; justify-self: end; }
+    .st__panel { grid-row: 3; }
+  }
   .st::before { inset: -20% -10%; }
 
   /* Tab list — scrolls horizontally on narrow screens instead of wrapping */
@@ -295,13 +310,12 @@ const launchGroups = (s: string): string[] => {
 
   .st__foot {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px clamp(16px, 3vw, 28px) clamp(12px, 2vw, 20px);
+    padding: 0 8px 0 12px;
   }
-  .st__foot-note { font-size: 0.8125rem; }
+  @media (max-width: 639px) {
+    .st__foot { padding: 4px 4px 0; }
+  }
 </style>
 
 <script>
