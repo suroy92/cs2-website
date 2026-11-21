@@ -1,0 +1,102 @@
+---
+/**
+ * Lite-YouTube facade: thumbnail + custom play button.
+ * The real iframe (youtube-nocookie.com, autoplay=1) is injected only on click,
+ * so the page ships zero YouTube JS until someone actually wants to watch.
+ */
+interface Props {
+  id: string;
+  title: string;
+  description?: string;
+}
+const { id, title, description } = Astro.props;
+const label = title || "Video";
+const maxres = `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
+const hq = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+---
+
+<article class="vc card card--interactive">
+  <div class="vc__frame" data-yt={id} data-yt-title={label}>
+    <img
+      class="vc__thumb"
+      src={maxres}
+      alt=""
+      width="1280"
+      height="720"
+      loading="lazy"
+      decoding="async"
+      onerror={`this.onerror=null;this.src='${hq}'`}
+      onload={`if(this.naturalWidth<=120&&this.src!=='${hq}'){this.onload=null;this.src='${hq}'}`}
+    />
+    <button class="vc__play" type="button" aria-label={`Play: ${label}`}>
+      <svg viewBox="0 0 68 48" width="68" height="48" aria-hidden="true">
+        <path class="vc__play-bg" d="M66.5 7.7A8.5 8.5 0 0 0 60.5 1.7C55.2.3 34 .3 34 .3s-21.2 0-26.5 1.4A8.5 8.5 0 0 0 1.5 7.7C.1 13 .1 24 .1 24s0 11 1.4 16.3a8.5 8.5 0 0 0 6 6C12.8 47.7 34 47.7 34 47.7s21.2 0 26.5-1.4a8.5 8.5 0 0 0 6-6C67.9 35 67.9 24 67.9 24s0-11-1.4-16.3z" />
+        <path d="M27 34V14l18 10z" fill="#fff" />
+      </svg>
+    </button>
+  </div>
+  {(title || description) && (
+    <div class="vc__body">
+      {title && <h3 class="vc__title">{title}</h3>}
+      {description && <p class="vc__desc muted">{description}</p>}
+    </div>
+  )}
+</article>
+
+<style>
+  .vc { overflow: hidden; }
+  .vc__frame {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--bg-indigo);
+  }
+  .vc__thumb,
+  .vc__frame :global(iframe) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .vc__thumb { object-fit: cover; transition: transform 600ms var(--ease), filter var(--dur) var(--ease); }
+  .vc:hover .vc__thumb { transform: scale(1.05); filter: brightness(1.08); }
+  .vc__play {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: linear-gradient(180deg, transparent 50%, rgba(10, 11, 34, 0.45));
+  }
+  .vc__play-bg { fill: var(--moon-red-fill); fill-opacity: 0.92; transition: fill var(--dur) var(--ease); }
+  .vc__play svg { filter: drop-shadow(0 6px 20px rgba(232, 38, 59, 0.55)); transition: transform var(--dur) var(--ease); }
+  .vc:hover .vc__play svg { transform: scale(1.08); }
+  .vc:hover .vc__play-bg { fill: var(--moon-red); }
+  .vc__play:focus-visible { outline-offset: -4px; border-radius: 0; }
+  .vc__body { padding: 16px 18px 18px; }
+  .vc__title { font-size: 1rem; font-weight: 600; color: var(--cream); line-height: 1.35; }
+  .vc__desc { margin-top: 6px; font-size: 0.875rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .vc:hover .vc__thumb, .vc:hover .vc__play svg { transform: none; }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-yt]").forEach((frame) => {
+    frame.querySelector("button")?.addEventListener(
+      "click",
+      () => {
+        const iframe = document.createElement("iframe");
+        iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(frame.dataset.yt!)}?autoplay=1&rel=0`;
+        iframe.title = frame.dataset.ytTitle || "YouTube video";
+        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+        iframe.allowFullscreen = true;
+        iframe.referrerPolicy = "strict-origin-when-cross-origin";
+        frame.replaceChildren(iframe);
+        iframe.focus();
+      },
+      { once: true },
+    );
+  });
+</script>

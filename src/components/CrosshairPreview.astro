@@ -1,0 +1,250 @@
+---
+/**
+ * Live crosshair preview, rendered as crisp SVG at build time from the
+ * crosshair values in profile.ts, drawn as literal pixels:
+ *   thickness → arm width in px
+ *   length    → arm length in px
+ *   gap       → px of empty space between each arm and the center
+ *               (the center itself is a thickness × thickness square)
+ * Shown at ACTUAL SIZE in real screen pixels: a small script divides by
+ * devicePixelRatio, so on a high-DPI / scaled display (or a zoomed browser)
+ * a 2px arm is still exactly 2 physical pixels.
+ *
+ * Backgrounds: every image in src/assets/crosshair-bg/ (in-game screenshots;
+ * the crosshair sits on the image's center). Dust II is the starting one;
+ * the others only download when their button is clicked. Images are shown at
+ * 1 image pixel = 1 screen pixel too, so the crosshair keeps its true
+ * proportion against the scene. Drop another screenshot in that folder to add one.
+ */
+import { getImage } from "astro:assets";
+import type { ImageMetadata } from "astro";
+
+interface Props {
+  length: number;
+  thickness: number;
+  gap: number;
+  outline: boolean;
+  outlineThickness?: number;
+  dot: boolean;
+  color: string;
+  alpha: number;
+  tStyle: boolean;
+}
+const p = Astro.props;
+
+const t = Math.max(1, p.thickness); // arm width (px)
+const len = Math.max(0, p.length); // arm length (px)
+const ot = p.outline ? Math.max(1, Math.round(p.outlineThickness ?? 1)) : 0;
+const h = t / 2;
+// distance from the center to where each arm starts
+const inner = Math.max(0, h + p.gap);
+
+// viewBox = the crosshair's footprint (+ a little margin), in pixels.
+// The SVG is rendered at V × V screen pixels, i.e. 1 unit = 1 pixel.
+const extent = 2 * (inner + len + ot);
+const V = Math.max(10, Math.ceil(extent) + 6);
+const c = V / 2;
+
+type R = { x: number; y: number; w: number; h: number };
+const rects: R[] = [];
+if (len > 0) {
+  rects.push({ x: c + inner, y: c - h, w: len, h: t }); // right
+  rects.push({ x: c - inner - len, y: c - h, w: len, h: t }); // left
+  rects.push({ x: c - h, y: c + inner, w: t, h: len }); // bottom
+  if (!p.tStyle) rects.push({ x: c - h, y: c - inner - len, w: t, h: len }); // top
+}
+if (p.dot) rects.push({ x: c - h, y: c - h, w: t, h: t });
+
+const fillOpacity = Math.min(1, Math.max(0, p.alpha / 255));
+const label = `Crosshair preview: ${p.tStyle ? "T-shaped" : "cross"}, ${p.color} color, length ${p.length}, gap ${p.gap}, thickness ${p.thickness}${p.dot ? ", with center dot" : ""}${p.outline ? ", with outline" : ""}.`;
+
+/* ---------- Map backgrounds ---------- */
+const files = import.meta.glob<{ default: ImageMetadata }>("../assets/crosshair-bg/*.{jpg,jpeg,png,webp,avif}", {
+  eager: true,
+});
+const NAMES: Record<string, string> = {
+  dust2: "Dust II",
+  mirage: "Mirage",
+  inferno: "Inferno",
+  nuke: "Nuke",
+  ancient: "Ancient",
+  anubis: "Anubis",
+  cache: "Cache",
+  overpass: "Overpass",
+  vertigo: "Vertigo",
+  train: "Train",
+};
+const ORDER = Object.keys(NAMES);
+const maps = (
+  await Promise.all(
+    Object.entries(files).map(async ([path, mod]) => {
+      const id = path.split("/").pop()!.replace(/\.\w+$/, "").toLowerCase();
+      const img = mod.default;
+      const [full, thumb] = await Promise.all([
+        getImage({ src: img, format: "webp", quality: 80 }),
+        getImage({ src: img, width: 64, height: 64, fit: "cover", format: "webp", quality: 60 }),
+      ]);
+      return {
+        id,
+        name: NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1),
+        full: full.src,
+        thumb: thumb.src,
+        w: img.width,
+        h: img.height,
+      };
+    }),
+  )
+).sort((a, b) => (ORDER.indexOf(a.id) + 1 || 99) - (ORDER.indexOf(b.id) + 1 || 99) || a.id.localeCompare(b.id));
+// The first map (Dust II) is the starting background, set on the server so it
+// shows immediately. With no images in the folder, the stage stays plain dark.
+const first = maps[0];
+const firstStyle = first ? `--map:url("${first.full}");--map-w:${first.w};--map-h:${first.h}` : undefined;
+---
+
+<figure class="xh" data-xh data-bg={first ? "map" : "dark"}>
+  <div class="xh__stage" style={firstStyle}>
+    <svg
+      class="xh__svg"
+      viewBox={`0 0 ${V} ${V}`}
+      width={V}
+      height={V}
+      data-px={V}
+      role="img"
+      aria-label={label}
+      shape-rendering="crispEdges"
+    >
+      {ot > 0 && rects.map((r) => (
+        <rect x={r.x - ot} y={r.y - ot} width={r.w + ot * 2} height={r.h + ot * 2} fill="#000" fill-opacity={fillOpacity} />
+      ))}
+      {rects.map((r) => <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={p.color} fill-opacity={fillOpacity} />)}
+    </svg>
+    <span class="xh__zoom pixel" aria-hidden="true">Actual size</span>
+  </div>
+  {maps.length > 1 && (
+  <figcaption class="xh__bar">
+    <div class="xh__swatches" role="group" aria-label="Preview background">
+      {maps.map((m, i) => (
+        <button
+          type="button"
+          class="xh__sw"
+          data-sw="map"
+          data-src={m.full}
+          data-w={m.w}
+          data-h={m.h}
+          aria-pressed={i === 0 ? "true" : "false"}
+          title={m.name}
+          style={`background-image:url("${m.thumb}")`}
+        >
+          <span class="sr-only">{m.name} background</span>
+        </button>
+      ))}
+    </div>
+  </figcaption>
+  )}
+</figure>
+
+<style>
+  .xh {
+    margin: 0;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: rgba(10, 11, 34, 0.6);
+  }
+  .xh__stage {
+    position: relative;
+    height: clamp(140px, 22vh, 200px);
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #2c2d33 0%, #1d1e22 100%);
+  }
+  /* Map: centered, at 1 image pixel = 1 screen pixel (--dpr set by the script) */
+  .xh[data-bg="map"] .xh__stage {
+    background:
+      /* 1 image px = 1 screen px; scaled up only if the strip is wider than the image */
+      var(--map) center / max(calc(var(--map-w, 960) * 1px / var(--dpr, 1)), 100%) auto no-repeat,
+      #1d1e22;
+  }
+  .xh__svg {
+    /* width/height = viewBox size → 1 unit = 1 px; JS corrects for devicePixelRatio */
+    flex: none;
+  }
+  .xh__zoom {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 0.625rem;
+  }
+  .xh__bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  .xh__swatches {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .xh__sw {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+    padding: 0;
+    background-color: #26272c;
+    background-position: center;
+    background-size: cover;
+    transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  }
+  .xh__sw:hover { transform: scale(1.1); }
+  .xh__sw[aria-pressed="true"] { border-color: var(--moon-red); }
+  @media (max-width: 420px) {
+    .xh__sw { width: 26px; height: 26px; }
+    .xh__swatches { gap: 5px; }
+  }
+</style>
+
+<script>
+  /* Keep the crosshair (and map backgrounds) at 1 unit = 1 PHYSICAL pixel,
+     whatever the display scaling or browser zoom (both change devicePixelRatio). */
+  const figs = [...document.querySelectorAll<HTMLElement>("[data-xh]")];
+  const fit = () => {
+    const dpr = window.devicePixelRatio || 1;
+    for (const fig of figs) {
+      fig.style.setProperty("--dpr", String(dpr));
+      fig.querySelectorAll<SVGSVGElement>(".xh__svg[data-px]").forEach((svg) => {
+        const css = `${Number(svg.dataset.px) / dpr}px`;
+        svg.style.width = css;
+        svg.style.height = css;
+      });
+    }
+    // re-arm for the next change in pixel ratio (zoom, moving to another monitor)
+    matchMedia(`(resolution: ${dpr}dppx)`).addEventListener("change", fit, { once: true });
+  };
+  fit();
+
+  for (const fig of figs) {
+    const stage = fig.querySelector<HTMLElement>(".xh__stage")!;
+    const btns = fig.querySelectorAll<HTMLButtonElement>("[data-sw]");
+    btns.forEach((b) =>
+      b.addEventListener("click", () => {
+        if (b.dataset.sw === "map") {
+          // set only on click, so map images load on demand
+          stage.style.setProperty("--map", `url("${b.dataset.src}")`);
+          stage.style.setProperty("--map-w", b.dataset.w!);
+          stage.style.setProperty("--map-h", b.dataset.h!);
+        }
+        fig.dataset.bg = b.dataset.sw;
+        btns.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      }),
+    );
+  }
+</script>

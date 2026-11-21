@@ -1,0 +1,340 @@
+---
+/**
+ * Settings — WAI-ARIA tabs (automatic activation).
+ * Keyboard: ←/→ move between tabs, Home/End jump, Tab moves into the panel.
+ * Tabs/rows arrive pre-filtered from lib/content.ts (unknown values never render).
+ */
+import Icon from "./Icon.astro";
+import CrosshairPreview from "./CrosshairPreview.astro";
+import SectionHeading from "./SectionHeading.astro";
+import type { Tab } from "../lib/content";
+import type { Profile } from "../lib/types";
+
+interface Props {
+  tabs: Tab[];
+  crosshair: Profile["crosshair"];
+  crosshairCode: string | null;
+  autoexec: string;
+  num?: string;
+}
+const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
+---
+
+<section class="section section--tint" id="settings" data-panel data-label="Settings" aria-labelledby="settings-title">
+  <div class="container">
+    <SectionHeading id="settings-title" eyebrow={`${num} / Config`} title="Settings" lede="Exactly what I run. Copy what you like." />
+
+    <div class="st card moon-glow" data-tabs>
+      <div class="st__tablist-wrap">
+        <div class="st__tablist" role="tablist" aria-label="Settings categories">
+          {tabs.map((t, i) => (
+            <button
+              class="st__tab"
+              type="button"
+              role="tab"
+              id={`tab-${t.id}`}
+              aria-controls={`panel-${t.id}`}
+              aria-selected={i === 0 ? "true" : "false"}
+              tabindex={i === 0 ? 0 : -1}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tabs.map((t, i) => (
+        <div
+          class:list={["st__panel", `st__panel--${t.id}`]}
+          role="tabpanel"
+          id={`panel-${t.id}`}
+          aria-labelledby={`tab-${t.id}`}
+          tabindex="0"
+          hidden={i !== 0}
+        >
+          {t.id === "crosshair" ? (
+            <div class="st__xh">
+              <div class="st__xh-preview">
+                <CrosshairPreview {...crosshair} />
+                {crosshairCode && (
+                  <button class="btn btn--primary st__xh-copy" type="button" data-copy={crosshairCode} data-copy-msg="Crosshair code copied">
+                    <Icon name="copy" /> Copy crosshair code
+                  </button>
+                )}
+              </div>
+              <dl class="kv">
+                {t.rows.map((r) => (
+                  <div class="kv__row">
+                    <dt>{r.label}</dt>
+                    <dd>
+                      {r.label === "Color" && <span class="kv__swatch" style={`background:${r.value}`} aria-hidden="true" />}
+                      {r.kind === "bool" ? <span class:list={["kv__bool", { "is-on": r.on }]}>{r.value}</span> : r.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : t.id === "launch" && t.code ? (
+            <div class="codeblock">
+              <pre><code>{t.code}</code></pre>
+              <button class="btn btn--ghost btn--sm codeblock__copy" type="button" data-copy={t.code} data-copy-msg="Launch options copied">
+                <Icon name="copy" size={16} /> Copy
+              </button>
+            </div>
+          ) : t.id === "binds" ? (
+            <dl class="kv">
+              {t.rows.map((r) => (
+                <div class="kv__row">
+                  <dt>{r.label}</dt>
+                  <dd><kbd class="kv__key">{r.value}</kbd></dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <dl class="kv">
+              {t.rows.map((r) => (
+                <div class="kv__row">
+                  <dt>{r.label}</dt>
+                  <dd>{r.kind === "bool" ? <span class:list={["kv__bool", { "is-on": r.on }]}>{r.value}</span> : r.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      ))}
+
+      <div class="st__foot">
+        <p class="muted st__foot-note">Values not listed are still being confirmed.</p>
+        <button class="btn btn--ghost btn--sm" type="button" data-autoexec={autoexec} data-filename="autoexec.cfg">
+          <Icon name="download" size={16} /> Download autoexec.cfg
+        </button>
+      </div>
+    </div>
+  </div>
+  <slot />
+</section>
+
+<style>
+  .st { padding: 8px; }
+  .st::before { inset: -20% -10%; }
+
+  /* Tab list — scrolls horizontally on narrow screens instead of wrapping */
+  .st__tablist-wrap {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, #000 88%, transparent);
+  }
+  .st__tablist-wrap::-webkit-scrollbar { display: none; }
+  @media (min-width: 1024px) {
+    .st__tablist-wrap { -webkit-mask-image: none; mask-image: none; }
+  }
+  .st__tablist {
+    display: flex;
+    gap: 4px;
+    width: max-content;
+    padding: 4px;
+  }
+  .st__tab {
+    position: relative;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+  }
+  .st__tab:hover { color: var(--text); background: rgba(185, 166, 255, 0.08); }
+  .st__tab[aria-selected="true"] {
+    color: var(--cream);
+    background: rgba(232, 38, 59, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(232, 38, 59, 0.45);
+  }
+  .st__tab[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 6px;
+    height: 2px;
+    background: var(--moon-red);
+    transform: skewX(-20deg);
+  }
+
+  .st__panel {
+    padding: clamp(16px, 3vw, 28px);
+    border-radius: 10px;
+  }
+  .st__panel:focus-visible { outline-offset: -2px; }
+
+  /* Key / value rows */
+  .kv {
+    margin: 0;
+    display: grid;
+    gap: 0 40px;
+  }
+  @media (min-width: 640px) {
+    .kv { grid-template-columns: 1fr 1fr; }
+  }
+  .kv__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 12px 2px;
+    border-bottom: 1px solid var(--border);
+  }
+  .kv dt { color: var(--text-muted); font-size: 0.9375rem; }
+  .kv dd {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-pixel);
+    font-size: 0.9375rem;
+    color: var(--cream);
+    text-align: right;
+  }
+  .kv__bool {
+    padding: 1px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border: 1px solid var(--border-strong);
+  }
+  .kv__bool.is-on { color: var(--moon-red-text); border-color: rgba(232, 38, 59, 0.55); background: rgba(232, 38, 59, 0.08); }
+  .kv__swatch { width: 14px; height: 14px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); }
+  .kv__key {
+    font-family: var(--font-pixel);
+    font-size: 0.8125rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 3px;
+    background: rgba(10, 11, 34, 0.5);
+  }
+
+  /* Crosshair tab layout */
+  .st__xh {
+    display: grid;
+    gap: 24px;
+    align-items: start;
+  }
+  /* preview spans the card; the settings sit underneath in columns */
+  .st__xh .kv { grid-template-columns: 1fr; }
+  @media (min-width: 640px) {
+    .st__xh .kv { grid-template-columns: 1fr 1fr; gap: 0 32px; }
+  }
+  @media (min-width: 1024px) {
+    .st__xh .kv { grid-template-columns: repeat(3, 1fr); }
+  }
+  .st__xh-preview { display: grid; gap: 14px; }
+  .st__xh-copy { width: 100%; }
+  @media (min-width: 640px) {
+    .st__xh-copy { width: auto; justify-self: end; }
+  }
+
+  /* Code block */
+  .codeblock {
+    position: relative;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(6, 7, 22, 0.7);
+  }
+  .codeblock pre {
+    margin: 0;
+    padding: 18px 20px;
+    padding-right: 96px;
+    overflow-x: auto;
+    font: 0.9375rem/1.6 var(--font-mono);
+    color: var(--cream);
+  }
+  .codeblock__copy { position: absolute; top: 8px; right: 8px; }
+
+  .st__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px clamp(16px, 3vw, 28px) clamp(12px, 2vw, 20px);
+  }
+  .st__foot-note { font-size: 0.8125rem; }
+</style>
+
+<script>
+  /* ---------- ARIA tabs ---------- */
+  document.querySelectorAll<HTMLElement>("[data-tabs]").forEach((root) => {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const select = (tab: HTMLButtonElement, focus = true) => {
+      for (const t of tabs) {
+        const on = t === tab;
+        t.setAttribute("aria-selected", String(on));
+        t.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById(t.getAttribute("aria-controls")!);
+        if (panel) panel.hidden = !on;
+      }
+      if (focus) tab.focus();
+      tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+    };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => select(tab));
+      tab.addEventListener("keydown", (e) => {
+        let next: number | null = null;
+        if (e.key === "ArrowRight") next = (i + 1) % tabs.length;
+        else if (e.key === "ArrowLeft") next = (i - 1 + tabs.length) % tabs.length;
+        else if (e.key === "Home") next = 0;
+        else if (e.key === "End") next = tabs.length - 1;
+        if (next !== null) {
+          e.preventDefault();
+          select(tabs[next]);
+        }
+      });
+    });
+  });
+
+  /* ---------- Copy to clipboard ---------- */
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fallback for non-secure contexts
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    }
+  }
+  document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const ok = await copy(btn.dataset.copy!);
+      (window as any).toast?.(ok ? btn.dataset.copyMsg || "Copied" : "Couldn't copy — select it manually");
+    });
+  });
+
+  /* ---------- autoexec.cfg download (generated from profile data) ---------- */
+  document.querySelectorAll<HTMLButtonElement>("[data-autoexec]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const blob = new Blob([btn.dataset.autoexec!], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = btn.dataset.filename || "autoexec.cfg";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      (window as any).toast?.("autoexec.cfg downloaded");
+    });
+  });
+</script>

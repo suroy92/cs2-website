@@ -1,0 +1,69 @@
+---
+/**
+ * Drifting sakura petals — pure CSS, no JS.
+ * 10 petals (6 on phones), low opacity, pointer-events: none.
+ * Removed entirely under prefers-reduced-motion.
+ * Values are fixed (not random) so the build is deterministic.
+ */
+const petals = [
+  { x: 6, size: 11, dur: 19, delay: -2, sway: 5.2, o: 0.45 },
+  { x: 18, size: 8, dur: 24, delay: -13, sway: 6.1, o: 0.32 },
+  { x: 31, size: 12, dur: 21, delay: -7, sway: 4.6, o: 0.4 },
+  { x: 47, size: 9, dur: 27, delay: -19, sway: 5.8, o: 0.3 },
+  { x: 58, size: 10, dur: 22, delay: -4, sway: 6.6, o: 0.38 },
+  { x: 71, size: 13, dur: 18, delay: -11, sway: 4.9, o: 0.42 },
+  { x: 83, size: 8, dur: 25, delay: -16, sway: 5.5, o: 0.3 },
+  { x: 92, size: 11, dur: 20, delay: -8, sway: 6.3, o: 0.4 },
+  { x: 39, size: 9, dur: 29, delay: -24, sway: 5, o: 0.28 },
+  { x: 65, size: 10, dur: 23, delay: -1, sway: 5.9, o: 0.34 },
+];
+---
+
+<div class="petals" aria-hidden="true">
+  {petals.map((p) => (
+    <span
+      class="petal"
+      style={`--x:${p.x}vw;--s:${p.size}px;--d:${p.dur}s;--dl:${p.delay}s;--sw:${p.sway}s;--o:${p.o}`}
+    ><i></i></span>
+  ))}
+</div>
+
+<style>
+  .petals {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .petal {
+    position: absolute;
+    top: -24px;
+    left: var(--x);
+    animation: fall var(--d) linear var(--dl) infinite;
+    will-change: transform;
+  }
+  .petal i {
+    display: block;
+    width: var(--s);
+    height: calc(var(--s) * 0.72);
+    border-radius: 100% 0 100% 0 / 100% 0 100% 0;
+    background: linear-gradient(135deg, #ffb3d1, var(--sakura) 60%, #e0457f);
+    opacity: var(--o);
+    animation: sway var(--sw) ease-in-out infinite alternate;
+  }
+  @keyframes fall {
+    from { transform: translate3d(0, -5vh, 0); }
+    to { transform: translate3d(-12vw, 110vh, 0); }
+  }
+  @keyframes sway {
+    from { transform: translateX(-14px) rotate(-25deg); }
+    to { transform: translateX(14px) rotate(55deg); }
+  }
+  @media (max-width: 639px) {
+    .petal:nth-child(n + 7) { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .petals { display: none; }
+  }
+</style>

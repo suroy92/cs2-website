@@ -1,0 +1,59 @@
+---
+/** PC rig — deliberately lighter than the gear cards: hairline dividers, no glass. */
+import Icon, { type IconName } from "./Icon.astro";
+
+interface Props {
+  parts: { part: string; name: string }[];
+}
+const { parts } = Astro.props;
+const ICONS: Record<string, IconName> = { cpu: "cpu", gpu: "gpu", ram: "ram", memory: "ram" };
+---
+
+<div class="rig">
+  <h3 id="rig-title" class="eyebrow rig__title">The rig</h3>
+  <dl class="rig__row">
+    {parts.map((p) => (
+      <div class="rig__item">
+        <dt class="pixel"><Icon name={ICONS[p.part.toLowerCase()] ?? "box"} size={18} /> {p.part}</dt>
+        <dd>{p.name}</dd>
+      </div>
+    ))}
+  </dl>
+</div>
+
+<style>
+  .rig { margin-top: clamp(40px, 6vw, 64px); }
+  .rig__title { margin-bottom: 14px; }
+  .rig__row {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    border-top: 1px solid var(--border);
+    /* a light frosted strip: readable over the art, still lighter than the gear cards */
+    background: rgba(10, 11, 34, 0.42);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  @media (min-width: 640px) {
+    .rig__row { grid-template-columns: repeat(3, 1fr); }
+  }
+  .rig__item {
+    padding: 16px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  @media (min-width: 640px) {
+    .rig__item { padding: 18px 20px; border-bottom: 0; }
+    .rig__item + .rig__item { border-left: 1px solid var(--border); }
+    .rig__item:first-child { padding-left: 16px; }
+  }
+  .rig dt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--lilac);
+    text-transform: uppercase;
+  }
+  .rig dd { margin: 6px 0 0; color: var(--text); font-weight: 500; }
+</style>

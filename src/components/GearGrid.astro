@@ -1,0 +1,72 @@
+---
+/** Peripherals — one glass card each. Unknown items are filtered upstream. */
+import Icon, { type IconName } from "./Icon.astro";
+
+interface Props {
+  items: { category: string; name: string; note?: string }[];
+}
+const { items } = Astro.props;
+
+const ICON_BY_CATEGORY: Record<string, IconName> = {
+  mouse: "mouse",
+  keyboard: "keyboard",
+  mousepad: "mousepad",
+  headset: "headset",
+  headphones: "headset",
+  monitor: "monitor",
+  controller: "gamepad",
+};
+const iconFor = (cat: string): IconName => ICON_BY_CATEGORY[cat.toLowerCase()] ?? "box";
+---
+
+<ul class="gear">
+  {items.map((g) => (
+    <li class="gear__card card card--interactive">
+      <span class="gear__icon"><Icon name={iconFor(g.category)} size={26} /></span>
+      <p class="gear__cat pixel">{g.category}</p>
+      <h3 class="gear__name">{g.name}</h3>
+      {g.note && <p class="gear__note muted">{g.note}</p>}
+    </li>
+  ))}
+</ul>
+
+<style>
+  .gear {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px) {
+    .gear { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1024px) {
+    .gear { grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  }
+  .gear__card {
+    padding: 22px 22px 24px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "icon cat"
+      "icon name"
+      "icon note";
+    column-gap: 18px;
+    align-content: start;
+  }
+  .gear__icon {
+    grid-area: icon;
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    color: var(--lilac);
+    background: rgba(123, 92, 224, 0.12);
+    border: 1px solid var(--border);
+    transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  }
+  .gear__card:hover .gear__icon { color: var(--cream); border-color: rgba(232, 38, 59, 0.45); }
+  .gear__cat { grid-area: cat; font-size: 0.75rem; color: var(--sakura); text-transform: uppercase; letter-spacing: 0.08em; }
+  .gear__name { grid-area: name; font-size: 1.125rem; font-weight: 600; color: var(--cream); line-height: 1.3; margin-top: 2px; }
+  .gear__note { grid-area: note; font-size: 0.875rem; margin-top: 4px; }
+</style>

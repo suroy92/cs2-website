@@ -1,0 +1,50 @@
+---
+/** Footer: handle, year, back-to-top. */
+import Icon from "./Icon.astro";
+
+interface Props {
+  handle: string;
+}
+const { handle } = Astro.props;
+const year = new Date().getFullYear();
+const m = /^(.*?)(1x)$/i.exec(handle);
+const [head, tail] = m ? [m[1], m[2]] : [handle, ""];
+---
+
+<footer class="ft">
+  <div class="container ft__inner">
+    <p class="ft__brand">
+      <span class="display ft__handle">{head}<span class="ft__x">{tail}</span></span>
+      <span class="muted">© {year}</span>
+    </p>
+    <a class="ft__top" href="#top">Back to top <Icon name="arrowUp" size={16} /></a>
+  </div>
+</footer>
+
+<style>
+  .ft {
+    border-top: 1px solid var(--border);
+    padding-block: 28px;
+    background: rgba(10, 11, 34, 0.6);
+  }
+  .ft__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ft__brand { display: flex; align-items: baseline; gap: 12px; font-size: 0.875rem; }
+  .ft__handle { font-size: 1.375rem; }
+  .ft__x { color: var(--moon-red); }
+  .ft__top {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 4px;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .ft__top:hover { color: var(--cream); }
+</style>

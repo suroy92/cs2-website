@@ -1,0 +1,165 @@
+---
+/**
+ * The whole site — a single page with anchor navigation.
+ * Every section reads pre-filtered data from lib/content.ts, and a
+ * section with nothing to show is not rendered at all.
+ */
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Intro from "../components/Intro.astro";
+import AboutStrip from "../components/AboutStrip.astro";
+import SettingsTabs from "../components/SettingsTabs.astro";
+import SectionHeading from "../components/SectionHeading.astro";
+import GearGrid from "../components/GearGrid.astro";
+import RigRow from "../components/RigRow.astro";
+import VideoCard from "../components/VideoCard.astro";
+import LinkCard from "../components/LinkCard.astro";
+import Footer from "../components/Footer.astro";
+import PanelRouter from "../components/PanelRouter.astro";
+import Icon from "../components/Icon.astro";
+import {
+  profile,
+  tabs,
+  crosshair,
+  crosshairCode,
+  buildAutoexec,
+  gear,
+  rig,
+  videos,
+  links,
+  youtubeUrl,
+  steamUrl,
+} from "../lib/content";
+
+const showSettings = tabs.length > 0;
+const showGear = gear.length > 0 || rig.length > 0;
+const showVideos = videos.length > 0;
+const showLinks = links.length > 0;
+
+// Section numbers follow what's actually visible.
+let n = 1;
+const num = () => String(n++).padStart(2, "0");
+const nums = {
+  settings: showSettings ? num() : "",
+  gear: showGear ? num() : "",
+  videos: showVideos ? num() : "",
+  links: showLinks ? num() : "",
+};
+
+// The last visible panel also carries the footer.
+const last = showLinks ? "links" : showVideos ? "videos" : showGear ? "gear" : showSettings ? "settings" : "about";
+
+const navItems = [
+  { href: "#about", label: "About" },
+  showSettings && { href: "#settings", label: "Settings" },
+  showGear && { href: "#gear", label: "Gear" },
+  showVideos && { href: "#videos", label: "Videos" },
+  showLinks && { href: "#links", label: "Links" },
+].filter(Boolean) as { href: string; label: string }[];
+---
+
+<Base>
+  <Nav handle={profile.handle} items={navItems} />
+
+  <!--
+    Each [data-panel] is one full-screen "page". With JS, PanelRouter shows
+    one at a time and animates between them; without JS they simply stack
+    and the page scrolls normally.
+  -->
+  <main id="main">
+    <Intro tagline={profile.tagline} handle={profile.handle} steamUrl={steamUrl} showSettings={showSettings} />
+
+    <section class="section" id="about" data-panel data-label="About" aria-labelledby="about-title">
+      <AboutStrip
+        displayName={profile.displayName}
+        badge={profile.badge}
+        role={profile.role}
+        avatar={profile.avatar}
+        handle={profile.handle}
+      />
+      {last === "about" && <Footer handle={profile.handle} />}
+    </section>
+
+    {showSettings && (
+      <SettingsTabs
+        tabs={tabs}
+        crosshair={crosshair}
+        crosshairCode={crosshairCode}
+        autoexec={buildAutoexec()}
+        num={nums.settings}
+      >
+        {last === "settings" && <Footer handle={profile.handle} />}
+      </SettingsTabs>
+    )}
+
+    {showGear && (
+      <section class="section" id="gear" data-panel data-label="Gear" aria-labelledby="gear-title">
+        <div class="container">
+          <SectionHeading id="gear-title" eyebrow={`${nums.gear} / Loadout`} title="Gear" />
+          {gear.length > 0 && <GearGrid items={gear} />}
+          {rig.length > 0 && <RigRow parts={rig} />}
+        </div>
+        {last === "gear" && <Footer handle={profile.handle} />}
+      </section>
+    )}
+
+    {showVideos && (
+      <section class="section section--tint" id="videos" data-panel data-label="Videos" aria-labelledby="videos-title">
+        <div class="container">
+          <SectionHeading id="videos-title" eyebrow={`${nums.videos} / Clips`} title="Videos" />
+          <div class="video-grid">
+            {videos.map((v) => <VideoCard id={v.id} title={v.title} description={v.description} />)}
+          </div>
+          {youtubeUrl && (
+            <p class="more">
+              <a class="btn btn--ghost" href={youtubeUrl} target="_blank" rel="noopener noreferrer">
+                More on YouTube <Icon name="external" size={16} />
+                <span class="sr-only">(opens in a new tab)</span>
+              </a>
+            </p>
+          )}
+        </div>
+        {last === "videos" && <Footer handle={profile.handle} />}
+      </section>
+    )}
+
+    {showLinks && (
+      <section class="section" id="links" data-panel data-label="Links" aria-labelledby="links-title">
+        <div class="container">
+          <SectionHeading id="links-title" eyebrow={`${nums.links} / Find me`} title="Links" />
+          <div class="link-grid">
+            {links.map((l) => <LinkCard kind={l.key} label={l.label} url={l.url} display={l.display} hint={l.hint} />)}
+          </div>
+        </div>
+        <Footer handle={profile.handle} />
+      </section>
+    )}
+  </main>
+
+  <PanelRouter />
+</Base>
+
+<style>
+  .video-grid {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px) {
+    .video-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 1024px) {
+    .video-grid { grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  }
+  .more { margin-top: 28px; display: flex; justify-content: center; }
+
+  .link-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px) {
+    /* 2 links → 2 wide cards, 3+ → 3 columns; never an empty slot */
+    .link-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  }
+</style>

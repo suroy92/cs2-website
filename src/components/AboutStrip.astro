@@ -1,0 +1,117 @@
+---
+/** About strip: avatar with a red "moon ring", name, badge chip and role line. */
+interface Props {
+  displayName: string;
+  badge?: string;
+  role?: string;
+  avatar: string;
+  handle: string;
+}
+const { displayName, badge, role, avatar, handle } = Astro.props;
+// "Full-time developer · Part-time gamer" → two parts, so phones can stack them neatly
+const roleParts = (role ?? "").split(/s*·s*/).filter(Boolean);
+---
+
+<div class="about">
+  <div class="container about__inner">
+    <div class="about__avatar moon-glow">
+      <img
+        src={avatar}
+        alt={`${handle}'s Steam avatar`}
+        width="184"
+        height="184"
+        loading="eager"
+        decoding="async"
+        referrerpolicy="no-referrer"
+      />
+    </div>
+    <div class="about__text">
+      <div class="about__title-row">
+        <h2 id="about-title" class="about__name display">{displayName}</h2>
+        {badge && <span class="chip about__badge">{badge}</span>}
+      </div>
+      {roleParts.length > 0 && (
+        <p class="about__role pixel">
+          {roleParts.map((part, i) => (
+            <>
+              {i > 0 && <span class="about__sep" aria-hidden="true"> · </span>}
+              <span class="about__role-part">{part}</span>
+            </>
+          ))}
+        </p>
+      )}
+    </div>
+  </div>
+</div>
+
+<style>
+  .about { padding-bottom: clamp(32px, 5vw, 56px); }
+  .about__inner {
+    display: grid;
+    gap: 24px;
+    justify-items: center;
+    text-align: center;
+  }
+  .about__avatar {
+    width: 132px;
+    height: 132px;
+    border-radius: 50%;
+    padding: 4px;
+    background: conic-gradient(from 210deg, var(--moon-red), #ff6b6b, var(--moon-red) 40%, rgba(232, 38, 59, 0.25) 60%, var(--moon-red));
+    box-shadow: 0 0 0 1px rgba(232, 38, 59, 0.4), 0 0 48px -6px rgba(232, 38, 59, 0.55);
+    flex: none;
+  }
+  .about__avatar::before { inset: -60%; }
+  .about__avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--bg-indigo);
+    border: 3px solid var(--bg-deep);
+  }
+  .about__title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px 14px;
+    margin-bottom: 8px;
+  }
+  .about__role {
+    margin-top: 6px;
+    font-size: clamp(1.0625rem, 2vw, 1.375rem);
+    line-height: 1.5;
+    color: var(--lilac);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .about__sep { color: var(--moon-red); }
+  .about__role-part { white-space: nowrap; }
+  @media (min-width: 768px) {
+    .about__role { white-space: nowrap; }
+  }
+  /* phones & small tablets: one part per line, no separator */
+  @media (max-width: 767px) {
+    .about__role-part { display: block; }
+    .about__sep { display: none; }
+  }
+  .about__name { font-size: clamp(2rem, 5vw, 2.75rem); }
+  .about__badge { color: var(--lantern); background: rgba(255, 138, 61, 0.08); }
+
+  @media (min-width: 640px) {
+    .about__inner {
+      grid-template-columns: auto 1fr;
+      justify-items: start;
+      text-align: left;
+      gap: 36px;
+      align-items: center;
+    }
+    .about__avatar { width: 160px; height: 160px; }
+    .about__title-row { justify-content: flex-start; }
+  }
+  @media (min-width: 1024px) {
+    .about__avatar { width: 184px; height: 184px; }
+    .about__inner { max-width: 960px; }
+  }
+</style>

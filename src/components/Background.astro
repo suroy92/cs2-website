@@ -1,0 +1,125 @@
+---
+/**
+ * Fixed, full-site background scene. Purely decorative (aria-hidden).
+ *
+ * Wide screens: desktop art, object-fit: cover.
+ * Tall screens (â¤ 4:5): phone art as two slices â top (moon, sakura) pinned
+ * to the top, bottom (horizon, samurai, city) pinned to the bottom â with a
+ * sky gradient sampled from the art filling the gap. Nothing gets cropped,
+ * whatever the phone's aspect ratio.
+ *
+ * A "veil" darkens the scene while you read (toggled once the intro
+ * scrolls away), so text over busy areas stays readable.
+ */
+import { getBackground, sky, TALL, DESKTOP_SIZES, PHONE_SIZES } from "../lib/background";
+
+const bg = await getBackground();
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+const vars = [
+  `--sky-top:${sky.skyTop}`,
+  `--sky-a:${sky.skyAtTopCut}`,
+  `--sky-b:${sky.skyAtBottomCut}`,
+  `--top-ratio:${bg.phoneTop.width}/${bg.phoneTop.height}`,
+  `--bot-ratio:${bg.phoneBottom.width}/${bg.phoneBottom.height}`,
+  // slice heights as a fraction of viewport width (used for gradient stops)
+  `--top-h:${((bg.phoneTop.height / bg.phoneTop.width) * 100).toFixed(2)}vw`,
+  `--bot-h:${((bg.phoneBottom.height / bg.phoneBottom.width) * 100).toFixed(2)}vw`,
+].join(";");
+---
+
+<div class="bg" aria-hidden="true" style={vars}>
+  <picture class="bg__main">
+    <source media={TALL} type="image/avif" srcset={bg.phoneTop.avif} sizes={PHONE_SIZES} />
+    <source media={TALL} type="image/webp" srcset={bg.phoneTop.webp} sizes={PHONE_SIZES} />
+    <source type="image/avif" srcset={bg.desktop.avif} sizes={DESKTOP_SIZES} />
+    <source type="image/webp" srcset={bg.desktop.webp} sizes={DESKTOP_SIZES} />
+    <img src={bg.desktop.fallback} alt="" width={bg.desktop.width} height={bg.desktop.height} decoding="async" fetchpriority="high" />
+  </picture>
+  <picture class="bg__bottom">
+    <source media={TALL} type="image/avif" srcset={bg.phoneBottom.avif} sizes={PHONE_SIZES} />
+    <source media={TALL} type="image/webp" srcset={bg.phoneBottom.webp} sizes={PHONE_SIZES} />
+    <img src={BLANK} alt="" width={bg.phoneBottom.width} height={bg.phoneBottom.height} decoding="async" />
+  </picture>
+  <div class="bg__veil"></div>
+</div>
+
+<style>
+  .bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    background: var(--sky-top);
+    pointer-events: none;
+  }
+  .bg picture { display: contents; }
+  .bg img { display: block; }
+
+  /* ---------- Wide: one image covers everything ---------- */
+  .bg__main img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* bias toward the moon (upper right) if the sides get trimmed */
+    object-position: 58% 45%;
+  }
+  .bg__bottom img { display: none; }
+
+  /* ---------- Tall: two slices + stretchable sky ---------- */
+  @media (max-aspect-ratio: 4/5) {
+    .bg {
+      /* min/max keep ≥30% of the height for the blend, even when the slices meet */
+      background: linear-gradient(180deg, var(--sky-a) min(var(--top-h), 35%), var(--sky-b) max(calc(100% - var(--bot-h)), 65%));
+    }
+    .bg__main img,
+    .bg__bottom img {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: auto;
+      object-fit: fill;
+    }
+    .bg__main img {
+      top: 0;
+      inset-inline: 0;
+      bottom: auto;
+      aspect-ratio: var(--top-ratio);
+      -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
+      mask-image: linear-gradient(180deg, #000 62%, transparent);
+    }
+    .bg__bottom img {
+      display: block;
+      bottom: 0;
+      aspect-ratio: var(--bot-ratio);
+      -webkit-mask-image: linear-gradient(0deg, #000 72%, transparent);
+      mask-image: linear-gradient(0deg, #000 72%, transparent);
+    }
+  }
+
+  /* ---------- Reading veil ---------- */
+  .bg__veil {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(10, 11, 34, 0.5) 0%, rgba(10, 11, 34, 0.6) 55%, rgba(10, 11, 34, 0.74) 100%);
+    opacity: 0;
+    transition: opacity 600ms var(--ease);
+  }
+  :global(body.is-reading) .bg__veil { opacity: 1; }
+</style>
+
+<script>
+  // Dim the scene once the intro has mostly scrolled away.
+  // (In page mode, PanelRouter toggles body.is-reading per page instead.)
+  const intro = document.querySelector("[data-intro]");
+  if (document.documentElement.classList.contains("js-panels")) {
+    // handled by PanelRouter
+  } else if (intro) {
+    new IntersectionObserver(([en]) => document.body.classList.toggle("is-reading", en.intersectionRatio < 0.55), {
+      threshold: [0, 0.55, 1],
+    }).observe(intro);
+  } else {
+    document.body.classList.add("is-reading");
+  }
+</script>

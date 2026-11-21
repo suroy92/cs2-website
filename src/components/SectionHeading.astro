@@ -1,0 +1,46 @@
+---
+/**
+ * Section heading with the signature "glitch / speed-line" underline
+ * (echoes the streaks on the wordmark).
+ */
+interface Props {
+  id: string;
+  eyebrow?: string;
+  title: string;
+  lede?: string;
+}
+const { id, eyebrow, title, lede } = Astro.props;
+---
+
+<header class="sh">
+  {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+  <h2 id={id} class="sh__title display">{title}</h2>
+  <span class="sh__streak" aria-hidden="true"></span>
+  {lede && <p class="sh__lede muted">{lede}</p>}
+</header>
+
+<style>
+  .sh { margin-bottom: clamp(28px, 4vw, 44px); }
+  .sh .eyebrow { margin-bottom: 10px; }
+  .sh__title { font-size: clamp(2.25rem, 5vw, 3.25rem); }
+  /* Three offset streaks: one solid, two thinner/shorter, like motion lines */
+  .sh__streak {
+    display: block;
+    position: relative;
+    width: 72px;
+    height: 3px;
+    margin-top: 14px;
+    background: var(--moon-red);
+    transform: skewX(-20deg);
+  }
+  .sh__streak::before,
+  .sh__streak::after {
+    content: "";
+    position: absolute;
+    height: 1px;
+    background: var(--moon-red);
+  }
+  .sh__streak::before { left: 82px; top: 1px; width: 22px; opacity: 0.7; }
+  .sh__streak::after { left: 18px; top: 7px; width: 40px; opacity: 0.45; }
+  .sh__lede { margin-top: 18px; max-width: 56ch; }
+</style>

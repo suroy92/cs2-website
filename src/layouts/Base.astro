@@ -1,0 +1,106 @@
+---
+/**
+ * Base document: <head> meta (SEO / Open Graph / Twitter), fonts,
+ * background preloads, the fixed background scene, petals, and the toast region.
+ */
+import "@fontsource/barlow-condensed/800-italic.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/silkscreen/400.css";
+import "../styles/global.css";
+
+import Petals from "../components/Petals.astro";
+import Background from "../components/Background.astro";
+import { getBackground, TALL, WIDE, DESKTOP_SIZES, PHONE_SIZES } from "../lib/background";
+import { profile } from "../data/profile";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = `${profile.handle} — CS2 settings, gear & videos`,
+  description = `${profile.tagline}. ${profile.handle}'s Counter-Strike 2 settings, crosshair, viewmodel, gear, rig, and videos.`,
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL(`${base}og.jpg`, Astro.site).href;
+const bg = await getBackground();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- JS available → full-screen page mode (see PanelRouter). Set before first paint. -->
+    <script is:inline>document.documentElement.classList.add("js-panels");</script>
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical.href} />
+    <meta name="theme-color" content="#0a0b22" />
+    <meta name="color-scheme" content="dark" />
+
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
+
+    <!-- Background art: preload exactly what <Background> will pick, per screen shape -->
+    <link rel="preload" as="image" type="image/avif" media={WIDE} imagesrcset={bg.desktop.avif} imagesizes={DESKTOP_SIZES} fetchpriority="high" />
+    <link rel="preload" as="image" type="image/avif" media={TALL} imagesrcset={bg.phoneTop.avif} imagesizes={PHONE_SIZES} fetchpriority="high" />
+    <link rel="preload" as="image" type="image/avif" media={TALL} imagesrcset={bg.phoneBottom.avif} imagesizes={PHONE_SIZES} />
+    <link rel="preconnect" href="https://avatars.fastly.steamstatic.com" crossorigin />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={profile.handle} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical.href} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={`${profile.handle} wordmark over a blood-red moon`} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "ProfilePage",
+      mainEntity: {
+        "@type": "Person",
+        name: profile.handle,
+        alternateName: profile.displayName,
+        description: [profile.bio].flat().join(" "),
+        image: profile.avatar,
+        sameAs: Object.values(profile.links).filter((u) => u && !/todo/i.test(u)),
+      },
+    })} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Background />
+    <Petals />
+    <slot />
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      // Tiny global toast helper used by copy buttons.
+      const el = document.getElementById("toast");
+      let t: number | undefined;
+      (window as any).toast = (msg: string) => {
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.add("is-visible");
+        clearTimeout(t);
+        t = window.setTimeout(() => el.classList.remove("is-visible"), 2200);
+      };
+    </script>
+  </body>
+</html>

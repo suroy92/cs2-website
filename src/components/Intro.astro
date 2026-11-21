@@ -1,0 +1,202 @@
+---
+/**
+ * Intro — first screen. The background scene is behind the whole site,
+ * so this is just the wordmark (HTML, echoing the original logo: heavy
+ * italic cream type, red "1x", speed-line streaks), the tagline, two
+ * CTAs and a scroll cue, sitting in the calm sky in the middle.
+ */
+import Icon from "./Icon.astro";
+
+interface Props {
+  tagline: string;
+  handle: string;
+  steamUrl: string | null;
+  showSettings: boolean;
+}
+const { tagline, handle, steamUrl, showSettings } = Astro.props;
+
+const m = /^(.*?)(1x)$/i.exec(handle);
+const [head, tail] = m ? [m[1], m[2]] : [handle, ""];
+---
+
+<section class="intro" id="top" data-intro data-panel data-label="Home" aria-labelledby="intro-title">
+  <div class="intro__inner container">
+    <h1 id="intro-title" class="wm">
+      <span class="wm__text"><span class="wm__head">{head}</span><span class="wm__tail">{tail}</span></span>
+      <span class="sr-only"> — Counter-Strike 2 settings, gear and videos</span>
+    </h1>
+
+    <p class="intro__tagline pixel">
+      <span class="intro__tick" aria-hidden="true"></span>{tagline}
+    </p>
+
+    <div class="intro__ctas">
+      {showSettings && (
+        <a class="btn btn--primary" href="#settings">
+          <Icon name="crosshair" /> View settings
+        </a>
+      )}
+      {steamUrl && (
+        <a class="btn btn--outline" href={steamUrl} target="_blank" rel="noopener noreferrer">
+          Steam profile <Icon name="external" size={16} />
+          <span class="sr-only">(opens in a new tab)</span>
+        </a>
+      )}
+    </div>
+  </div>
+
+  <a class="intro__cue" href="#about">
+    <span class="intro__mouse" aria-hidden="true"><span class="intro__wheel"></span></span>
+    <span class="pixel intro__cue-label">Scroll</span>
+  </a>
+</section>
+
+<style>
+  .intro {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    /* sit a little above true center: the calm sky band is above the horizon */
+    padding: var(--nav-h) 0 18svh;
+  }
+  .intro__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+  }
+
+  /* ---------- Wordmark ---------- */
+  .wm {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-style: italic;
+    line-height: 0.9;
+    font-size: clamp(4rem, 17vw, 9.5rem);
+    letter-spacing: 0.01em;
+  }
+  .wm__text {
+    position: relative;
+    display: inline-block;
+    padding-inline: 0.06em 0.1em; /* room for the italic overhang */
+  }
+  .wm__head {
+    color: var(--cream);
+    text-shadow:
+      -0.025em 0 0 rgba(232, 38, 59, 0.45),
+      0.02em 0 0 rgba(123, 92, 224, 0.45),
+      0 0.05em 0.35em rgba(10, 11, 34, 0.75);
+  }
+  .wm__tail {
+    color: var(--moon-red);
+    text-shadow:
+      0 0 0.25em rgba(232, 38, 59, 0.55),
+      0 0.05em 0.35em rgba(10, 11, 34, 0.75);
+  }
+  /* Speed-line streaks on both sides, like the original logo */
+  .wm__text::before,
+  .wm__text::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0.7em;
+    background:
+      linear-gradient(90deg, transparent, rgba(245, 230, 211, 0.85)) 0 34% / 100% 0.045em no-repeat,
+      linear-gradient(90deg, transparent, rgba(232, 38, 59, 0.9)) 100% 56% / 65% 0.03em no-repeat,
+      linear-gradient(90deg, transparent, rgba(245, 230, 211, 0.45)) 100% 74% / 40% 0.03em no-repeat;
+    pointer-events: none;
+  }
+  .wm__text::before { right: 100%; }
+  .wm__text::after { left: 100%; transform: scaleX(-1); }
+
+  /* ---------- Tagline + CTAs ---------- */
+  .intro__tagline {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: clamp(0.8125rem, 1.2vw, 0.9375rem);
+    color: var(--cream);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(10, 11, 34, 0.5);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+  }
+  .intro__tick {
+    width: 18px;
+    height: 2px;
+    background: var(--moon-red);
+    box-shadow: 0 4px 0 -0.5px rgba(232, 38, 59, 0.5);
+  }
+  .intro__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  /* ---------- Scroll cue ---------- */
+  .intro__cue {
+    position: absolute;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 12px;
+    color: var(--cream);
+    text-decoration: none;
+    background: rgba(10, 11, 34, 0.35);
+  }
+  .intro__cue:hover { background: rgba(10, 11, 34, 0.6); }
+  .intro__mouse {
+    width: 22px;
+    height: 34px;
+    border: 1.5px solid currentColor;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    padding-top: 6px;
+  }
+  .intro__wheel {
+    width: 3px;
+    height: 7px;
+    border-radius: 2px;
+    background: var(--moon-red);
+    animation: wheel 1.8s var(--ease) infinite;
+  }
+  .intro__cue-label { font-size: 0.625rem; letter-spacing: 0.14em; text-transform: uppercase; }
+  @keyframes wheel {
+    0% { transform: translateY(0); opacity: 1; }
+    70% { transform: translateY(10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 0; }
+  }
+
+  /* Tall screens: the calm band sits between the moon and the horizon */
+  @media (max-aspect-ratio: 4/5) {
+    .intro { padding-bottom: 14svh; }
+    .wm__text::before, .wm__text::after { width: 0.45em; }
+  }
+  /* Short landscape screens */
+  @media (orientation: landscape) and (max-height: 520px) {
+    .intro { padding-bottom: 24px; }
+    .intro__cue { display: none; }
+    .wm { font-size: clamp(3rem, 10vw, 5rem); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .intro__wheel { animation: none; }
+  }
+</style>
