@@ -16,9 +16,8 @@ interface Props {
   crosshairCode: string | null;
   /** autoexec.cfg contents, base64-encoded (exact bytes) */
   autoexec: string;
-  num?: string;
 }
-const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
+const { tabs, crosshair, crosshairCode, autoexec } = Astro.props;
 
 /** Launch options → wrap-safe groups: each option stays with its value,
  *  e.g. "-fullscreen", "+exec autoexec.cfg", "-allow_third_party_software". */
@@ -39,7 +38,7 @@ const launchGroups = (s: string): string[] => {
 
 <section class="section section--tint" id="settings" data-panel data-label="Settings" aria-labelledby="settings-title">
   <div class="container">
-    <SectionHeading id="settings-title" eyebrow={`${num} / Config`} title="Settings" lede="Exactly what I run. Copy what you like." />
+    <SectionHeading id="settings-title" title="Settings" lede="Exactly what I run. Copy what you like." />
 
     <div class="st card moon-glow" data-tabs>
       <div class="st__tablist-wrap">

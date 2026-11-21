@@ -14,7 +14,7 @@ const ICONS: Record<string, IconName> = { cpu: "cpu", gpu: "gpu", ram: "ram", me
   <dl class="rig__row">
     {parts.map((p) => (
       <div class="rig__item">
-        <dt class="pixel"><Icon name={ICONS[p.part.toLowerCase()] ?? "box"} size={18} /> {p.part}</dt>
+        <dt class="techno"><Icon name={ICONS[p.part.toLowerCase()] ?? "box"} size={18} /> {p.part}</dt>
         <dd>{p.name}</dd>
       </div>
     ))}

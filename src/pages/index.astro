@@ -36,15 +36,6 @@ const showGear = gear.length > 0 || rig.length > 0;
 const showVideos = videos.length > 0;
 const showLinks = links.length > 0;
 
-// Section numbers follow what's actually visible.
-let n = 1;
-const num = () => String(n++).padStart(2, "0");
-const nums = {
-  settings: showSettings ? num() : "",
-  gear: showGear ? num() : "",
-  videos: showVideos ? num() : "",
-  links: showLinks ? num() : "",
-};
 
 // The last visible panel also carries the footer.
 const last = showLinks ? "links" : showVideos ? "videos" : showGear ? "gear" : showSettings ? "settings" : "about";
@@ -87,7 +78,6 @@ const navItems = [
         crosshair={crosshair}
         crosshairCode={crosshairCode}
         autoexec={getAutoexecBase64()}
-        num={nums.settings}
       >
         {last === "settings" && <Footer handle={profile.handle} />}
       </SettingsTabs>
@@ -96,7 +86,7 @@ const navItems = [
     {showGear && (
       <section class="section" id="gear" data-panel data-label="Gear" aria-labelledby="gear-title">
         <div class="container">
-          <SectionHeading id="gear-title" eyebrow={`${nums.gear} / Loadout`} title="Gear" />
+          <SectionHeading id="gear-title" title="Gear" />
           {gear.length > 0 && <GearGrid items={gear} />}
           {rig.length > 0 && <RigRow parts={rig} />}
         </div>
@@ -107,7 +97,7 @@ const navItems = [
     {showVideos && (
       <section class="section section--tint" id="videos" data-panel data-label="Videos" aria-labelledby="videos-title">
         <div class="container">
-          <SectionHeading id="videos-title" eyebrow={`${nums.videos} / Clips`} title="Videos" />
+          <SectionHeading id="videos-title" title="Videos" />
           <div class="video-grid">
             {videos.map((v) => <VideoCard id={v.id} title={v.title} description={v.description} />)}
           </div>
@@ -127,7 +117,7 @@ const navItems = [
     {showLinks && (
       <section class="section" id="links" data-panel data-label="Links" aria-labelledby="links-title">
         <div class="container">
-          <SectionHeading id="links-title" eyebrow={`${nums.links} / Find me`} title="Links" />
+          <SectionHeading id="links-title" title="Links" />
           <div class="link-grid">
             {links.map((l) => <LinkCard kind={l.key} label={l.label} url={l.url} display={l.display} hint={l.hint} />)}
           </div>

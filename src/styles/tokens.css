@@ -31,8 +31,7 @@
   /* Type */
   --font-display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-pixel: "Silkscreen", ui-monospace, "Cascadia Mono", monospace;
-  /* readable techno font for setting values */
+  /* readable techno font: setting values, labels, tags, badges */
   --font-value: "Exo 2", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Menlo, Consolas, monospace;
 

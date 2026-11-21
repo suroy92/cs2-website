@@ -30,7 +30,7 @@ const iconFor = (cat: string): IconName => ICON_BY_CATEGORY[cat.toLowerCase()] ?
       <li class="gear__item">
         <Tag class:list={["gear__card card card--interactive", { "gear__card--link": g.url }]} {...linkProps}>
           <span class="gear__icon"><Icon name={iconFor(g.category)} size={26} /></span>
-          <p class="gear__cat pixel">{g.category}</p>
+          <p class="gear__cat techno">{g.category}</p>
           <h3 class="gear__name">{g.name}</h3>
           {g.note && <p class="gear__note muted">{g.note}</p>}
           {g.url && (
