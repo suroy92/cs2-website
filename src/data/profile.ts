@@ -21,10 +21,10 @@ export const profile: Profile = {
   badge: "Ancient Artifact",
   tagline: "CS veteran since 2002",
   role: "Full-time developer · Part-time gamer",
-  // One line per paragraph. Keep it short.
+  // Short lines shown under the role in the About section (one per line).
   bio: [
-    "By day I write code for a living: cloud platforms, microservices and AI tools, from Java and TypeScript to local LLMs.",
-    "By night I'm in Counter-Strike, like I have been since 2002. Skipped CS2's launch, came back out of boredom, and still top the scoreboard half-asleep on 800 DPI.",
+    "I help turn software ideas into products people actually use.",
+    "I play games for fun and for the clips.",
   ],
   avatar: "https://avatars.fastly.steamstatic.com/77df7851b64f84e1639cadab4db4a72ac8996b62_full.jpg",
   steamId64: "76561197961132406",

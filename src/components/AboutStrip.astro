@@ -1,15 +1,17 @@
 ---
-/** About strip: avatar with a red "moon ring", name, badge chip and role line. */
+/** About strip: avatar with a red "moon ring", name, badge chip, role line and a couple of short lines. */
 interface Props {
   displayName: string;
   badge?: string;
   role?: string;
+  bio?: string | string[];
   avatar: string;
   handle: string;
 }
-const { displayName, badge, role, avatar, handle } = Astro.props;
+const { displayName, badge, role, bio, avatar, handle } = Astro.props;
 // "Full-time developer · Part-time gamer" → two parts, so phones can stack them neatly
-const roleParts = (role ?? "").split(/s*·s*/).filter(Boolean);
+const roleParts = (role ?? "").split(/\s*·\s*/).filter(Boolean);
+const lines = [bio ?? []].flat().filter((l) => l.trim());
 ---
 
 <div class="about">
@@ -39,6 +41,11 @@ const roleParts = (role ?? "").split(/s*·s*/).filter(Boolean);
             </>
           ))}
         </p>
+      )}
+      {lines.length > 0 && (
+        <div class="about__lines">
+          {lines.map((l) => <p>{l}</p>)}
+        </div>
       )}
     </div>
   </div>
@@ -87,6 +94,17 @@ const roleParts = (role ?? "").split(/s*·s*/).filter(Boolean);
     letter-spacing: 0.06em;
   }
   .about__sep { color: var(--moon-red); }
+  /* the two short lines under the role */
+  .about__lines {
+    margin-top: 14px;
+    display: grid;
+    gap: 4px;
+    font-size: clamp(1rem, 1.4vw, 1.125rem);
+    line-height: 1.5;
+    color: var(--text);
+    text-shadow: 0 1px 12px rgba(10, 11, 34, 0.85);
+  }
+  .about__lines p { text-wrap: balance; } /* even line lengths when a line wraps */
   .about__role-part { white-space: nowrap; }
   @media (min-width: 768px) {
     .about__role { white-space: nowrap; }
