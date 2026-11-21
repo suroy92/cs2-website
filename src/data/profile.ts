@@ -24,7 +24,7 @@ export const profile: Profile = {
   // Short lines shown under the role in the About section (one per line).
   bio: [
     "I help turn software ideas into products people actually use.",
-    "I play games for fun and for the clips.",
+    "I play CS for fun and for the clips.",
   ],
   avatar: "https://avatars.fastly.steamstatic.com/77df7851b64f84e1639cadab4db4a72ac8996b62_full.jpg",
   steamId64: "76561197961132406",
@@ -97,11 +97,21 @@ export const profile: Profile = {
   binds: [{ action: "Jump throw", key: "TODO" }],
 
   gear: [
-    { category: "Mouse", name: "MCHOSE L7 Ultra" },
-    { category: "Keyboard", name: "Xinmeng X URX Zero68", note: "Hall Effect" },
-    { category: "Mousepad", name: "Xraypad Unique Heavy Bee Esports Mousepad - SOFT", note: "Control-Type" },
-    { category: "Headset", name: "HyperX Cloud Earbuds III" },
-    { category: "Monitor", name: "Kreo Obsidian 27in 200Hz 2K 1440p QHD Gaming IPS Monitor", note: "200Hz" },
+    { category: "Mouse", name: "MCHOSE L7 Ultra", url: "https://www.genesispc.in/products/mchose-l7" },
+    { category: "Keyboard", name: "Xinmeng X URX Zero68", note: "Hall Effect", url: "https://urx.co.in/products/zero68-he" },
+    {
+      category: "Mousepad",
+      name: "Xraypad Unique Heavy Bee Esports Mousepad - SOFT",
+      note: "Control-Type",
+      url: "https://www.genesispc.in/products/xraypad-unique-heavy-bee?variant=44891380219957",
+    },
+    { category: "Headset", name: "HyperX Cloud Earbuds III", url: "https://amzn.in/d/0ic75lkk" },
+    {
+      category: "Monitor",
+      name: "Kreo Obsidian 27in 200Hz 2K 1440p QHD Gaming IPS Monitor",
+      note: "200Hz",
+      url: "https://kreo-tech.com/collections/monitors/products/obsidian-27-inch-gaming-monitor",
+    },
   ],
 
   pc: [
@@ -112,5 +122,5 @@ export const profile: Profile = {
 
   // Paste the 11-character ID from a YouTube URL:
   // https://www.youtube.com/watch?v=dQw4w9WgXcQ  →  id: "dQw4w9WgXcQ"
-  videos: [{ id: "5C09gmuuiVA", title: "CS 2 Highlights", description: "" }],
+  videos: [{ id: "5C09gmuuiVA", title: "CS 2 Highlights", description: "Some CS 2 gameplay highlights" }],
 };

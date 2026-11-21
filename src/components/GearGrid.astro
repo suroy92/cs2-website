@@ -1,9 +1,12 @@
 ---
-/** Peripherals — one glass card each. Unknown items are filtered upstream. */
+/**
+ * Peripherals — one glass card each. Unknown items are filtered upstream.
+ * Items with a `url` become links to the product page (new tab).
+ */
 import Icon, { type IconName } from "./Icon.astro";
 
 interface Props {
-  items: { category: string; name: string; note?: string }[];
+  items: { category: string; name: string; note?: string; url?: string }[];
 }
 const { items } = Astro.props;
 
@@ -20,14 +23,26 @@ const iconFor = (cat: string): IconName => ICON_BY_CATEGORY[cat.toLowerCase()] ?
 ---
 
 <ul class="gear">
-  {items.map((g) => (
-    <li class="gear__card card card--interactive">
-      <span class="gear__icon"><Icon name={iconFor(g.category)} size={26} /></span>
-      <p class="gear__cat pixel">{g.category}</p>
-      <h3 class="gear__name">{g.name}</h3>
-      {g.note && <p class="gear__note muted">{g.note}</p>}
-    </li>
-  ))}
+  {items.map((g) => {
+    const Tag = g.url ? "a" : "div";
+    const linkProps = g.url ? { href: g.url, target: "_blank", rel: "noopener noreferrer" } : {};
+    return (
+      <li class="gear__item">
+        <Tag class:list={["gear__card card card--interactive", { "gear__card--link": g.url }]} {...linkProps}>
+          <span class="gear__icon"><Icon name={iconFor(g.category)} size={26} /></span>
+          <p class="gear__cat pixel">{g.category}</p>
+          <h3 class="gear__name">{g.name}</h3>
+          {g.note && <p class="gear__note muted">{g.note}</p>}
+          {g.url && (
+            <>
+              <span class="gear__arrow" aria-hidden="true"><Icon name="external" size={18} /></span>
+              <span class="sr-only">(opens the product page in a new tab)</span>
+            </>
+          )}
+        </Tag>
+      </li>
+    );
+  })}
 </ul>
 
 <style>
@@ -42,6 +57,7 @@ const iconFor = (cat: string): IconName => ICON_BY_CATEGORY[cat.toLowerCase()] ?
   @media (min-width: 1024px) {
     .gear { grid-template-columns: repeat(3, 1fr); gap: 20px; }
   }
+  .gear__item { display: grid; } /* card fills the cell, so a row's cards share one height */
   .gear__card {
     padding: 22px 22px 24px;
     display: grid;
@@ -52,6 +68,11 @@ const iconFor = (cat: string): IconName => ICON_BY_CATEGORY[cat.toLowerCase()] ?
       "icon note";
     column-gap: 18px;
     align-content: start;
+  }
+  .gear__card--link {
+    text-decoration: none;
+    color: inherit;
+    padding-right: 44px; /* room for the arrow */
   }
   .gear__icon {
     grid-area: icon;
@@ -69,4 +90,16 @@ const iconFor = (cat: string): IconName => ICON_BY_CATEGORY[cat.toLowerCase()] ?
   .gear__cat { grid-area: cat; font-size: 0.75rem; color: var(--sakura); text-transform: uppercase; letter-spacing: 0.08em; }
   .gear__name { grid-area: name; font-size: 1.125rem; font-weight: 600; color: var(--cream); line-height: 1.3; margin-top: 2px; }
   .gear__note { grid-area: note; font-size: 0.875rem; margin-top: 4px; }
+  .gear__arrow {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    color: var(--text-muted);
+    transition: transform var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .gear__card--link:hover .gear__arrow,
+  .gear__card--link:focus-visible .gear__arrow {
+    color: var(--moon-red-text);
+    transform: translate(2px, -2px);
+  }
 </style>

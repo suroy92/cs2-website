@@ -21,6 +21,17 @@ export const anyNum = (v: unknown): v is number => typeof v === "number" && Numb
 
 export const knownBool = (v: unknown): v is boolean => typeof v === "boolean";
 
+/** Valid URL that isn't a placeholder. */
+const knownUrl = (u: unknown): u is string => {
+  if (!knownStr(u)) return false;
+  try {
+    new URL(u);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /* ---------- formatting ---------- */
 
 const onOff = (b: boolean) => (b ? "On" : "Off");
@@ -220,7 +231,7 @@ export function buildAutoexec(): string {
 
 export const gear = profile.gear
   .filter((g) => knownStr(g.name))
-  .map((g) => ({ ...g, note: knownStr(g.note) ? g.note : undefined }));
+  .map((g) => ({ ...g, note: knownStr(g.note) ? g.note : undefined, url: knownUrl(g.url) ? g.url : undefined }));
 
 export const rig = profile.pc.filter((p) => knownStr(p.name));
 
@@ -242,17 +253,6 @@ const LINK_META: Record<LinkKey, { label: string; hint?: string }> = {
   twitch: { label: "Twitch" },
   x: { label: "X" },
   discord: { label: "Discord" },
-};
-
-/** Valid URL that isn't a placeholder. */
-const knownUrl = (u: unknown): u is string => {
-  if (!knownStr(u)) return false;
-  try {
-    new URL(u);
-    return true;
-  } catch {
-    return false;
-  }
 };
 
 /**

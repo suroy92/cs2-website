@@ -55,7 +55,8 @@ export interface Profile {
   };
   launchOptions: string;
   binds: { action: string; key: string }[];
-  gear: { category: string; name: string; note?: string }[];
+  /** url (optional) makes the card a link to the product page */
+  gear: { category: string; name: string; note?: string; url?: string }[];
   pc: { part: string; name: string }[];
   videos: { id: string; title: string; description?: string }[];
 }
