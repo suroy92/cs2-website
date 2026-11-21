@@ -8,3 +8,6 @@
 *.webp binary
 *.avif binary
 *.ico binary
+
+# Served byte-for-byte by the "Download autoexec.cfg" button: keep its own line endings
+src/data/autoexec.cfg -text

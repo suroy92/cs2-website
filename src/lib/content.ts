@@ -162,7 +162,23 @@ export const tabs: Tab[] = [
   { id: "binds", label: "Binds", rows: bindRows },
 ].filter((t) => t.rows.length > 0 || t.code);
 
-/* ---------- autoexec.cfg (generated client-side from this string) ---------- */
+/* ---------- autoexec.cfg ----------
+   The "Download autoexec.cfg" button serves src/data/autoexec.cfg exactly as
+   it is (your real file: comments, binds, everything). Refresh it with
+   `npm run sync-cfg`. If that file doesn't exist, a config is generated
+   from the values in profile.ts instead (buildAutoexec below). */
+
+const realAutoexec = Object.values(
+  import.meta.glob<string>("../data/autoexec.cfg", { query: "?raw", import: "default", eager: true }),
+)[0];
+
+export function getAutoexec(): string {
+  return realAutoexec?.trim() ? realAutoexec : buildAutoexec();
+}
+
+/** Base64 so the bytes survive the trip through HTML untouched
+ *  (browsers turn CRLF into LF inside attributes). Decoded on click. */
+export const getAutoexecBase64 = (): string => Buffer.from(getAutoexec(), "utf8").toString("base64");
 
 function hexToRgb(hex: string): [number, number, number] | null {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());

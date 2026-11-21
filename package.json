@@ -12,7 +12,8 @@
     "precheck": "node scripts/ensure-native.mjs && node scripts/prepare-images.mjs",
     "check": "astro check",
     "images": "node scripts/prepare-images.mjs",
-    "postinstall": "node scripts/ensure-native.mjs"
+    "postinstall": "node scripts/ensure-native.mjs",
+    "sync-cfg": "node scripts/sync-cfg.mjs"
   },
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.3.0",

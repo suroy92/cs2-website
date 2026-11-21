@@ -14,6 +14,7 @@ interface Props {
   tabs: Tab[];
   crosshair: Profile["crosshair"];
   crosshairCode: string | null;
+  /** autoexec.cfg contents, base64-encoded (exact bytes) */
   autoexec: string;
   num?: string;
 }
@@ -322,10 +323,12 @@ const { tabs, crosshair, crosshairCode, autoexec, num = "01" } = Astro.props;
     });
   });
 
-  /* ---------- autoexec.cfg download (generated from profile data) ---------- */
+  /* ---------- autoexec.cfg download (your real file, or one generated from profile.ts) ---------- */
   document.querySelectorAll<HTMLButtonElement>("[data-autoexec]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const blob = new Blob([btn.dataset.autoexec!], { type: "text/plain" });
+      // base64 → exact original bytes (keeps the file's own line endings)
+      const bytes = Uint8Array.from(atob(btn.dataset.autoexec!), (ch) => ch.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

@@ -22,7 +22,7 @@ import {
   tabs,
   crosshair,
   crosshairCode,
-  buildAutoexec,
+  getAutoexecBase64,
   gear,
   rig,
   videos,
@@ -86,7 +86,7 @@ const navItems = [
         tabs={tabs}
         crosshair={crosshair}
         crosshairCode={crosshairCode}
-        autoexec={buildAutoexec()}
+        autoexec={getAutoexecBase64()}
         num={nums.settings}
       >
         {last === "settings" && <Footer handle={profile.handle} />}

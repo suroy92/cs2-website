@@ -40,6 +40,14 @@ launchOptions: "-novid -high +fps_max 0",             // Launch Options tab appe
 binds: [{ action: "Jump throw", key: "Mouse 4" }],    // Binds tab appears
 ```
 
+**Your real config files.** `src/data/autoexec.cfg` is what the **Download autoexec.cfg** button serves, byte for byte, including your comments and binds. `src/data/cs2_video.txt` feeds the Video tab. After changing settings in-game, refresh both with:
+
+```bash
+npm run sync-cfg   # copies them from your Steam folders, then commit & push
+```
+
+The script is set up with this PC's Steam paths. If they change, override them with `CS2_AUTOEXEC` / `CS2_VIDEO_CFG`. If `src/data/autoexec.cfg` is deleted, the button falls back to a config generated from `profile.ts`.
+
 **Video settings** come straight from your game's own file. Copy
 `C:\Program Files (x86)\Steam\userdata\<your-id>\730\local\cfg\cs2_video.txt` over
 [`src/data/cs2_video.txt`](src/data/cs2_video.txt) and rebuild. [`src/lib/video.ts`](src/lib/video.ts) translates each entry into the name and option label shown in CS2's Video menu, in menu order. If a value isn't in its table, the row is hidden and the build prints a warning telling you what to add. Brightness, Boost Player Contrast, scaling mode and fps_max aren't stored in that file, so they live in `profile.video`.

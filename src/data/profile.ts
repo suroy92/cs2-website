@@ -59,7 +59,7 @@ export const profile: Profile = {
     dpi: 1000,
     sensitivity: 0.88, // in-game sensitivity → eDPI 880 is calculated automatically
     pollingRate: 2000, // Hz
-    zoomSensitivity: 1.0, // not shown on the site; used in the generated autoexec.cfg
+    zoomSensitivity: 1.0, // not shown on the site
   },
 
   // From autoexec.cfg (cl_crosshair* commands)
