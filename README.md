@@ -95,6 +95,24 @@ Each section is a full-screen **page**: Home → About → Settings → Gear →
 - **Without JavaScript:** the pages simply stack and the site scrolls like a normal page.
 - **The code:** all of this lives in [`src/components/PanelRouter.astro`](src/components/PanelRouter.astro). Any `<section data-panel data-label="…">` directly inside `<main>` becomes a page.
 
+## Sensitivity tester (`/sens`)
+
+A full-window app where anyone can aim around a 3D room with their CS2 sensitivity, 1-to-1. It's linked from the **Mouse** tab in Settings (on phones that tab says "Available on desktop" instead). The settings panel opens over the room; **Go** (or Enter) enters fullscreen and captures the mouse; **Esc** brings the settings back. On Chrome and Edge you stay in fullscreen while you adjust; holding Esc leaves fullscreen.
+
+There are two modes:
+
+- **Free aim:** endless pop-up targets. Click to shoot. The HUD shows hits, accuracy and time per target.
+- **Sensitivity finder:** 7 blind A/B rounds (the "Perfect Sensitivity Approach"). Each round you shoot 12 targets with Sens A and the same 12 with Sens B, then pick the one that felt better. It starts at 50% and 150% of your sens and halves the gap every round. Which side is lower stays hidden until the end. The result screen shows your sens, eDPI and cm/360, with a **Copy `sensitivity X`** button and **Try it in free aim**.
+
+What makes it 1-to-1:
+
+- **The same turn per mouse count:** CS2's `0.022 × sensitivity` degrees, read as raw input (no acceleration) in Chrome, Edge and Firefox 152+.
+- **The same view:** CS2's fixed 73.74° vertical field of view, drawn at your in-game resolution and stretched or black-barred the way your GPU does it. Use **Go fullscreen** for the true 1:1 view.
+- **Readouts:** eDPI, cm/360, degrees per count, field of view, and how much stretching speeds up sideways motion.
+- **Browser check:** a ruler test that confirms the browser passes mouse counts through untouched. It corrects only browser display-scaling errors, never your mouse's own DPI variation, because CS2 sees that same mouse.
+
+It's prefilled with your DPI, sens, in-game resolution and scaling mode from `profile.ts` and `cs2_video.txt`. Visitors' changes are saved only in their own browser. The math is in [`src/lib/sens.ts`](src/lib/sens.ts) and the page is [`src/pages/sens.astro`](src/pages/sens.astro). Three.js loads only on this page.
+
 ## The background scene
 
 The art is a **fixed background behind the whole site**. A dark veil fades in on every page except the first one, so text stays readable. There are two versions:

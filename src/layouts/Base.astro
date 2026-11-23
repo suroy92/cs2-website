@@ -18,11 +18,17 @@ import { profile } from "../data/profile";
 interface Props {
   title?: string;
   description?: string;
+  /** full-screen page-by-page mode (home page only) */
+  panels?: boolean;
+  /** drifting sakura petals (off for the full-window sens tester) */
+  petals?: boolean;
 }
 
 const {
   title = `${profile.handle} — CS2 settings, gear & videos`,
   description = `${profile.tagline}. ${profile.handle}'s Counter-Strike 2 settings, crosshair, viewmodel, gear, rig, and videos.`,
+  panels = false,
+  petals = true,
 } = Astro.props;
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
@@ -36,8 +42,8 @@ const bg = await getBackground();
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- JS available → full-screen page mode (see PanelRouter). Set before first paint. -->
-    <script is:inline>document.documentElement.classList.add("js-panels");</script>
+    <!-- Home page only: JS available → full-screen page mode (see PanelRouter). Set before first paint. -->
+    {panels && <script is:inline>document.documentElement.classList.add("js-panels");</script>}
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical.href} />
@@ -86,7 +92,7 @@ const bg = await getBackground();
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <Background />
-    <Petals />
+    {petals && <Petals />}
     <slot />
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

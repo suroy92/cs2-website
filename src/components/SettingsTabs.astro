@@ -18,6 +18,7 @@ interface Props {
   autoexec: string;
 }
 const { tabs, crosshair, crosshairCode, autoexec } = Astro.props;
+const sensHref = `${import.meta.env.BASE_URL.replace(/\/?$/, "/")}sens`;
 
 /** Launch options → wrap-safe groups: each option stays with its value,
  *  e.g. "-fullscreen", "+exec autoexec.cfg", "-allow_third_party_software". */
@@ -108,14 +109,25 @@ const launchGroups = (s: string): string[] => {
               ))}
             </dl>
           ) : (
-            <dl class="kv">
-              {t.rows.map((r) => (
-                <div class="kv__row">
-                  <dt>{r.label}</dt>
-                  <dd>{r.kind === "bool" ? <span class:list={["kv__bool", { "is-on": r.on }]}>{r.value}</span> : r.value}</dd>
+            <>
+              <dl class="kv">
+                {t.rows.map((r) => (
+                  <div class="kv__row">
+                    <dt>{r.label}</dt>
+                    <dd>{r.kind === "bool" ? <span class:list={["kv__bool", { "is-on": r.on }]}>{r.value}</span> : r.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {t.id === "mouse" && (
+                <div class="st__cta">
+                  <p>Find your ideal sensitivity: test any CS2 sens 1-to-1 in your browser.</p>
+                  <a class="btn btn--primary btn--sm st__cta-btn" href={sensHref}>
+                    Open sensitivity tester <Icon name="external" size={16} />
+                  </a>
+                  <span class="st__cta-mobile">Available on desktop</span>
                 </div>
-              ))}
-            </dl>
+              )}
+            </>
           )}
         </div>
       ))}
@@ -306,6 +318,33 @@ const launchGroups = (s: string): string[] => {
     .codeblock { flex-direction: column; align-items: stretch; gap: 4px; padding: 8px; }
     .codeblock pre { padding: 8px 8px 4px; }
     .codeblock__copy { align-self: flex-end; }
+  }
+
+  /* Mouse tab → sensitivity tester */
+  .st__cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(232, 38, 59, 0.35);
+    background: rgba(232, 38, 59, 0.06);
+  }
+  .st__cta p { font-size: 0.9375rem; color: var(--cream); }
+  .st__cta-mobile {
+    display: none;
+    font-family: var(--font-value);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+  /* touch-only devices: the tester needs a mouse */
+  @media (hover: none) and (pointer: coarse) {
+    .st__cta-btn { display: none; }
+    .st__cta-mobile { display: inline; }
   }
 
   .st__foot {

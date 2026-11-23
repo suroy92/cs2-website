@@ -1,0 +1,1335 @@
+---
+/**
+ * /sens — CS2 sensitivity tester, as a full-window app.
+ *
+ * Flow: the room fills the window with the settings panel over it → "Go"
+ * enters fullscreen and captures the mouse (browsers only allow both on a
+ * click) → aim and shoot → Esc brings the settings back → Go again.
+ *
+ * Modes:
+ *  - Free aim: endless pop-up targets, live hits / accuracy / time.
+ *  - Sensitivity finder: the "Perfect Sensitivity Approach". 7 blind A/B
+ *    rounds between a low and a high sens (start: 50% and 150% of yours);
+ *    the one you prefer keeps its side and the range halves each round.
+ *    A and B in a round use the identical (seeded) target sequence.
+ *
+ * Turns exactly like CS2: one mouse count = 0.022 × sensitivity degrees,
+ * raw input (Pointer Lock `unadjustedMovement`), CS2's fixed 73.74° vertical
+ * FOV, and your scaling (stretched / black bars / native) reproduced by
+ * rendering at the in-game resolution and stretching it like the GPU does.
+ * All math lives in src/lib/sens.ts.
+ */
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import { profile } from "../lib/content";
+import { videoCfg } from "../lib/video";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+
+// Defaults: the site owner's own setup (visitors can change everything).
+const scalingText = (profile.video.scalingMode ?? "").toLowerCase();
+const defaults = {
+  dpi: profile.mouse.dpi,
+  sens: profile.mouse.sensitivity,
+  gameW: Number(videoCfg["setting.defaultres"]) || 1280,
+  gameH: Number(videoCfg["setting.defaultresheight"]) || 960,
+  scaling: scalingText.includes("black") ? "blackbars" : scalingText.includes("native") ? "native" : "stretched",
+};
+
+// Crosshair (same literal-pixel geometry as the Settings preview), drawn in game pixels.
+const c = profile.crosshair;
+const t = Math.max(1, c.thickness);
+const len = Math.max(0, c.length);
+const h = t / 2;
+const inner = Math.max(0, h + c.gap);
+const V = Math.max(10, Math.ceil(2 * (inner + len)) + 6);
+const mid = V / 2;
+const xRects = len > 0
+  ? [
+      { x: mid + inner, y: mid - h, w: len, h: t },
+      { x: mid - inner - len, y: mid - h, w: len, h: t },
+      { x: mid - h, y: mid + inner, w: t, h: len },
+      ...(c.tStyle ? [] : [{ x: mid - h, y: mid - inner - len, w: t, h: len }]),
+    ]
+  : [];
+if (c.dot) xRects.push({ x: mid - h, y: mid - h, w: t, h: t });
+const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
+---
+
+<Base
+  title={`Sensitivity tester · ${profile.handle}`}
+  description="Test and find your CS2 sensitivity in the browser, 1-to-1: same turn per mouse count, same field of view, same stretched or black-bars view."
+  petals={false}
+>
+  <main id="main" class="app" data-app data-defaults={JSON.stringify(defaults)}>
+    <!-- ---------- the room ---------- -->
+    <div class="app__view" data-view>
+      <canvas class="app__canvas" data-canvas></canvas>
+      <svg
+        class="app__xh"
+        data-xh
+        data-px={V}
+        viewBox={`0 0 ${V} ${V}`}
+        preserveAspectRatio="none"
+        shape-rendering="crispEdges"
+        aria-hidden="true"
+      >
+        {xRects.map((r) => <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={c.color} fill-opacity={xOpacity} />)}
+      </svg>
+      <span class="app__hit" data-hit aria-hidden="true"></span>
+    </div>
+
+    <div class="app__hud" data-hud hidden>
+      <span data-hud="task"></span>
+      <span><b data-hud="turn">0.0°</b> turned</span>
+      <span data-hud="raw"></span>
+      <span class="app__hud-warn" data-hud="window" hidden>window mode: view not 1-to-1</span>
+      <span class="app__hud-hint">Esc: settings</span>
+    </div>
+    <div class="app__banner" data-banner hidden>
+      <b data-banner-title></b>
+      <span data-banner-text></span>
+    </div>
+
+    <!-- ---------- settings panel (shown until Go, and again on Esc) ---------- -->
+    <div class="app__menu" data-menu>
+      <form class="app__panel" data-setup autocomplete="off">
+        <header class="app__head">
+          <a class="app__back" href={`${base}#settings`}>
+            <span aria-hidden="true">←</span> Back to {profile.handle}
+          </a>
+          <h1 class="display app__title">Sensitivity tester</h1>
+          <p class="app__lede">
+            Your CS2 sensitivity, 1-to-1 in the browser: same turn per mouse count, same field of view, same stretch.
+          </p>
+        </header>
+
+        <p class="app__unsupported" data-unsupported hidden>
+          <Icon name="mouse" size={20} />
+          <span>This tool needs a desktop browser and a mouse. Open it on your PC in Chrome, Edge or Firefox 152+.</span>
+        </p>
+
+        <fieldset class="app__modes">
+          <legend class="sr-only">Mode</legend>
+          <label class="app__mode">
+            <input type="radio" name="mode" value="free" checked />
+            <span><b>Free aim</b><small>Shoot pop-up targets at your own pace</small></span>
+          </label>
+          <label class="app__mode">
+            <input type="radio" name="mode" value="finder" />
+            <span><b>Sensitivity finder</b><small>7 quick A/B rounds to find your best sens</small></span>
+          </label>
+        </fieldset>
+
+        <!-- finder: intro / pick A or B / result -->
+        <section class="app__finder" data-finder hidden>
+          <div data-finder-intro>
+            <h2 class="app__h">How the finder works</h2>
+            <p class="app__text">
+              Each round you shoot 12 targets with <b>Sens A</b>, then the same 12 with <b>Sens B</b>, and pick the one
+              that <em>felt</em> better. Which one is lower stays hidden until the end. It starts at half and one and a
+              half times your sensitivity below, and the gap halves every round. 7 rounds, about 4 minutes.
+            </p>
+          </div>
+
+          <div data-finder-choice hidden>
+            <h2 class="app__h" data-choice-title>Which felt better?</h2>
+            <div class="app__ab">
+              <div class="app__ab-card">
+                <p class="app__ab-name">Sens A</p>
+                <p class="app__ab-stats" data-stats="A"></p>
+                <button class="btn btn--primary" type="button" data-pick="A">A felt better</button>
+              </div>
+              <div class="app__ab-card">
+                <p class="app__ab-name">Sens B</p>
+                <p class="app__ab-stats" data-stats="B"></p>
+                <button class="btn btn--primary" type="button" data-pick="B">B felt better</button>
+              </div>
+            </div>
+            <p class="app__ab-foot">
+              The numbers are a hint: go with what felt more controlled.
+              <button class="app__link" type="button" data-replay>Replay this round</button>
+            </p>
+          </div>
+
+          <div data-finder-done hidden>
+            <h2 class="app__h">Your sensitivity</h2>
+            <p class="app__result"><span data-result>–</span><small data-result-meta></small></p>
+            <div class="app__result-actions">
+              <button class="btn btn--primary" type="button" data-copy-result>
+                <Icon name="copy" size={18} /> Copy <code data-result-cmd></code>
+              </button>
+              <button class="btn btn--outline" type="button" data-try-result>Try it in free aim</button>
+              <button class="btn btn--ghost" type="button" data-restart>Start over</button>
+            </div>
+            <details class="app__history">
+              <summary>Round by round</summary>
+              <table>
+                <thead><tr><th>Round</th><th>A</th><th>B</th><th>Picked</th></tr></thead>
+                <tbody data-history></tbody>
+              </table>
+            </details>
+          </div>
+        </section>
+
+        <div class="app__cols">
+          <fieldset class="app__group">
+            <legend class="app__h">Your setup</legend>
+            <div class="app__fields">
+              <label class="app__field">
+                <span>Mouse DPI</span>
+                <input name="dpi" type="number" min="50" max="64000" step="any" inputmode="decimal" required />
+              </label>
+              <label class="app__field">
+                <span>CS2 sensitivity</span>
+                <input name="sens" type="number" min="0.01" max="20" step="any" inputmode="decimal" required />
+              </label>
+              <fieldset class="app__field app__field--wide">
+                <legend>In-game resolution</legend>
+                <div class="app__pair">
+                  <input name="gameW" type="number" min="320" max="7680" step="1" aria-label="In-game width" required />
+                  <span aria-hidden="true">×</span>
+                  <input name="gameH" type="number" min="240" max="4320" step="1" aria-label="In-game height" required />
+                </div>
+              </fieldset>
+              <label class="app__field app__field--wide">
+                <span>Scaling</span>
+                <select name="scaling">
+                  <option value="stretched">Stretched (fills the screen)</option>
+                  <option value="blackbars">Black bars</option>
+                  <option value="native">Native (same as monitor)</option>
+                </select>
+              </label>
+              <fieldset class="app__field app__field--wide">
+                <legend>Monitor resolution</legend>
+                <div class="app__pair">
+                  <input name="monW" type="number" min="320" max="15360" step="1" aria-label="Monitor width" required />
+                  <span aria-hidden="true">×</span>
+                  <input name="monH" type="number" min="240" max="8640" step="1" aria-label="Monitor height" required />
+                  <button class="btn btn--ghost btn--sm" type="button" data-detect>Detect</button>
+                </div>
+              </fieldset>
+            </div>
+            <p class="app__note">Prefilled with {profile.handle}'s settings. Saved in this browser only.</p>
+          </fieldset>
+
+          <section class="app__group" aria-labelledby="readout-title">
+            <h2 id="readout-title" class="app__h">What that means</h2>
+            <dl class="app__stats">
+              <div><dt>eDPI</dt><dd data-out="edpi">–</dd></div>
+              <div><dt>cm / 360°</dt><dd data-out="cm360">–</dd></div>
+              <div><dt>Degrees per count</dt><dd data-out="dpc">–</dd></div>
+              <div><dt>Field of view (H × V)</dt><dd data-out="fov">–</dd></div>
+              <div><dt>Horizontal stretch</dt><dd data-out="stretch">–</dd></div>
+              <div><dt>Sideways speed on screen vs native</dt><dd data-out="speed">–</dd></div>
+            </dl>
+          </section>
+        </div>
+
+        <details class="app__calib">
+          <summary>Check your browser <span class="app__optional">(optional)</span></summary>
+          <p class="app__text">
+            Confirms the browser passes your mouse through untouched. Put the mouse at the start of a ruler,
+            click <b>Start</b>, slide it straight right by the distance below, then click again.
+          </p>
+          <div class="app__calib-row">
+            <label class="app__field app__field--inline">
+              <span>Distance (cm)</span>
+              <input name="calibCm" type="number" min="2" max="60" step="any" value="10" data-calib-cm />
+            </label>
+            <button class="btn btn--ghost btn--sm" type="button" data-calib-start>Start</button>
+          </div>
+          <div class="app__calib-pad" data-calib-pad tabindex="-1" aria-hidden="true">
+            <span data-calib-live>Moving… 0 counts. Click when you reach the mark.</span>
+          </div>
+          <p class="app__calib-result" data-calib-result role="status" aria-live="polite"></p>
+        </details>
+
+        <div class="app__go-row" data-go-row>
+          <p class="app__status" data-status role="status" aria-live="polite"></p>
+          <button class="btn btn--primary app__go" type="submit" data-go>
+            <Icon name="crosshair" /> <span data-go-label>Go</span>
+          </button>
+        </div>
+        <p class="app__tip">
+          In the room: <b>click</b> to shoot, <b>Esc</b> brings these settings back. The red post is 0°: turn until
+          you're back on it to check a full 360.
+        </p>
+      </form>
+    </div>
+  </main>
+</Base>
+
+<style>
+  /* the whole page is the app */
+  :global(html),
+  :global(body) { overflow: hidden; }
+
+  .app {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    background: #000;
+  }
+  .app__view {
+    position: absolute;
+    inset: 0 auto 0 50%;
+    width: calc(var(--view-w, 1) * 100%);
+    transform: translateX(-50%);
+  }
+  .app__canvas { width: 100%; height: 100%; display: block; }
+  .app__xh {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  /* Hit marker: four short white ticks in an X around the crosshair.
+     Shown for a fixed 130 ms by script (not a CSS animation), so it also
+     appears when the OS has animations turned off (reduced motion). */
+  .app__hit {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 30px;
+    height: 30px;
+    transform: translate(-50%, -50%) rotate(45deg);
+    background:
+      linear-gradient(#fff, #fff) center top / 2px 9px no-repeat,
+      linear-gradient(#fff, #fff) center bottom / 2px 9px no-repeat,
+      linear-gradient(#fff, #fff) left center / 9px 2px no-repeat,
+      linear-gradient(#fff, #fff) right center / 9px 2px no-repeat;
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9));
+    opacity: 0;
+    pointer-events: none;
+  }
+  .app__hit.is-on { opacity: 1; }
+
+  /* ---------- HUD & banner ---------- */
+  .app__hud {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-family: var(--font-value);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    pointer-events: none;
+  }
+  .app__hud[hidden] { display: none; }
+  .app__hud b { color: var(--cream); }
+  .app__hud-hint { color: var(--text-muted); }
+  .app__hud-warn { color: var(--lantern); }
+  .app__hud-warn[hidden] { display: none; }
+  .app__hud [data-hud="task"]:empty { display: none; }
+
+  .app__banner {
+    position: absolute;
+    left: 50%;
+    top: 22%;
+    transform: translateX(-50%);
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    padding: 12px 22px;
+    border-radius: 12px;
+    background: rgba(10, 11, 34, 0.72);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    text-align: center;
+    pointer-events: none;
+  }
+  .app__banner[hidden] { display: none; }
+  .app__banner b { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.75rem; color: var(--cream); }
+  .app__banner span { font-family: var(--font-value); font-weight: 600; }
+
+  /* ---------- settings panel ---------- */
+  .app__menu {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    overflow-y: auto;
+    padding: clamp(12px, 3vh, 32px) 16px;
+    background: rgba(10, 11, 34, 0.6);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+  .app__menu[hidden] { display: none; }
+  .app__panel {
+    width: min(980px, 100%);
+    margin: auto;
+    padding: clamp(18px, 3vw, 28px);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: rgba(20, 18, 52, 0.86);
+    box-shadow: 0 24px 80px -24px rgba(0, 0, 0, 0.8);
+  }
+  .app__head { margin-bottom: 16px; }
+  .app__back {
+    display: inline-flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .app__back:hover { color: var(--cream); }
+  .app__title { font-size: clamp(1.875rem, 4vw, 2.75rem); }
+  .app__lede { margin-top: 6px; color: var(--text-muted); font-size: 0.9375rem; }
+
+  .app__unsupported {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 138, 61, 0.5);
+    color: var(--cream);
+  }
+  .app__unsupported[hidden] { display: none; }
+  .app__unsupported :global(svg) { flex: none; }
+
+  /* mode switch */
+  .app__modes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 0 0 18px;
+    padding: 0;
+    border: 0;
+  }
+  .app__mode { position: relative; cursor: pointer; }
+  .app__mode input { position: absolute; opacity: 0; pointer-events: none; }
+  .app__mode > span {
+    display: grid;
+    gap: 2px;
+    height: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
+    background: rgba(10, 11, 34, 0.45);
+    transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+  }
+  .app__mode b { font-family: var(--font-value); font-weight: 600; color: var(--cream); }
+  .app__mode small { font-size: 0.8125rem; color: var(--text-muted); }
+  .app__mode:hover > span { border-color: var(--lilac); }
+  .app__mode input:checked + span { border-color: var(--moon-red); background: rgba(232, 38, 59, 0.1); }
+  .app__mode input:focus-visible + span { outline: 2px solid var(--moon-red); outline-offset: 2px; }
+  @media (max-width: 560px) {
+    .app__modes { grid-template-columns: 1fr; }
+  }
+
+  /* finder */
+  .app__finder {
+    margin-bottom: 18px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(232, 38, 59, 0.35);
+    background: rgba(232, 38, 59, 0.05);
+  }
+  .app__finder[hidden],
+  .app__finder [hidden] { display: none; }
+  .app__ab { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .app__ab-card {
+    display: grid;
+    gap: 8px;
+    justify-items: start;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
+    background: rgba(10, 11, 34, 0.5);
+  }
+  .app__ab-name { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.5rem; color: var(--cream); }
+  .app__ab-stats { font-family: var(--font-value); font-weight: 600; font-size: 0.875rem; color: var(--text); }
+  .app__ab-foot { margin-top: 10px; font-size: 0.8125rem; color: var(--text-muted); }
+  .app__link {
+    margin-left: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--lilac);
+    text-decoration: underline;
+    font: inherit;
+  }
+  .app__result {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 800;
+    font-size: clamp(2.5rem, 6vw, 3.5rem);
+    line-height: 1;
+    color: var(--cream);
+  }
+  .app__result small { font-family: var(--font-value); font-style: normal; font-weight: 600; font-size: 0.9375rem; color: var(--text-muted); }
+  .app__result-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .app__result-actions code { font-family: var(--font-mono); font-size: 0.875rem; }
+  .app__history { margin-top: 14px; font-size: 0.875rem; }
+  .app__history summary { cursor: pointer; color: var(--lilac); }
+  .app__history table { margin-top: 8px; width: 100%; max-width: 420px; border-collapse: collapse; font-family: var(--font-value); font-weight: 600; }
+  .app__history th,
+  .app__history td { padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  .app__history th { color: var(--text-muted); font-weight: 600; }
+  @media (max-width: 560px) {
+    .app__ab { grid-template-columns: 1fr; }
+  }
+
+  .app__cols { display: grid; gap: 16px 28px; }
+  @media (min-width: 860px) {
+    .app__cols { grid-template-columns: 1.1fr 1fr; }
+  }
+  .app__group { margin: 0; padding: 0; border: 0; min-width: 0; }
+  .app__h {
+    padding: 0;
+    margin-bottom: 12px;
+    font-family: var(--font-value);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lilac);
+  }
+
+  .app__fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .app__field { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+  .app__field--wide { grid-column: 1 / -1; }
+  .app__field > span,
+  .app__field > legend { font-size: 0.8125rem; color: var(--text-muted); padding: 0; }
+  .app__field input,
+  .app__field select {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: rgba(10, 11, 34, 0.6);
+    color: var(--cream);
+    font-family: var(--font-value);
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  .app__field select { font-family: var(--font-body); font-weight: 500; font-size: 0.9375rem; }
+  .app__field input:focus-visible,
+  .app__field select:focus-visible { outline: 2px solid var(--moon-red); outline-offset: 1px; }
+  .app__pair { display: flex; align-items: center; gap: 8px; }
+  .app__pair > span { color: var(--text-muted); }
+  .app__pair .btn { flex: none; }
+  .app__note { margin-top: 10px; font-size: 0.8125rem; color: var(--text-muted); }
+
+  .app__stats { margin: 0; display: grid; }
+  .app__stats > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .app__stats > div:last-child { border-bottom: 0; }
+  .app__stats dt { color: var(--text-muted); font-size: 0.875rem; }
+  .app__stats dd { margin: 0; font-family: var(--font-value); font-weight: 600; color: var(--cream); text-align: right; }
+
+  /* calibration (collapsible) */
+  .app__calib {
+    margin-top: 18px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(10, 11, 34, 0.35);
+  }
+  .app__calib summary {
+    cursor: pointer;
+    font-family: var(--font-value);
+    font-weight: 600;
+    color: var(--cream);
+  }
+  .app__optional { color: var(--text-muted); font-weight: 500; }
+  .app__text { margin-top: 10px; font-size: 0.875rem; }
+  .app__finder .app__text { margin-top: 0; }
+  .app__calib-row { display: flex; align-items: flex-end; gap: 12px; margin-top: 12px; max-width: 420px; }
+  .app__field--inline { flex: 1; }
+  .app__calib-pad {
+    display: none;
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px dashed rgba(232, 38, 59, 0.6);
+    background: rgba(232, 38, 59, 0.06);
+    font-family: var(--font-value);
+    font-weight: 600;
+    color: var(--cream);
+  }
+  .app__calib-pad.is-active { display: block; }
+  .app__calib-result { margin-top: 12px; font-size: 0.875rem; }
+  .app__calib-result:empty { display: none; }
+  .app__calib-result b { color: var(--cream); }
+
+  .app__go-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px 20px;
+    margin-top: 20px;
+  }
+  .app__go-row[hidden] { display: none; }
+  .app__status { flex: 1 1 260px; font-size: 0.875rem; color: var(--text-muted); }
+  .app__status:empty { display: none; }
+  .app__go { min-width: 170px; min-height: 48px; font-size: 1.0625rem; }
+  .app__go:disabled { opacity: 0.6; cursor: wait; }
+  .app__tip { margin-top: 12px; font-size: 0.8125rem; color: var(--text-muted); text-align: right; }
+  .app__tip b { color: var(--cream); }
+</style>
+
+<script>
+  import {
+    BackSide,
+    BoxGeometry,
+    CanvasTexture,
+    Color,
+    CylinderGeometry,
+    Group,
+    Mesh,
+    MeshBasicMaterial,
+    PerspectiveCamera,
+    RepeatWrapping,
+    Scene,
+    SphereGeometry,
+    SRGBColorSpace,
+    Vector3,
+    WebGLRenderer,
+  } from "three";
+  import { M_YAW, M_PITCH, PITCH_LIMIT, VFOV, cm360, eDPI, degPerCount, viewModel, aspectLabel, type Scaling } from "../lib/sens";
+
+  const $ = <T extends Element>(sel: string) => document.querySelector<T>(sel)!;
+  const app = $<HTMLElement>("[data-app]");
+  const form = $<HTMLFormElement>("[data-setup]");
+  const view = $<HTMLElement>("[data-view]");
+  const canvas = $<HTMLCanvasElement>("[data-canvas]");
+  const xh = $<SVGSVGElement>("[data-xh]");
+  const hitEl = $<HTMLElement>("[data-hit]");
+  const hud = $<HTMLElement>("[data-hud]");
+  const banner = $<HTMLElement>("[data-banner]");
+  const menu = $<HTMLElement>("[data-menu]");
+  const goRow = $<HTMLElement>("[data-go-row]");
+  const goBtn = $<HTMLButtonElement>("[data-go]");
+  const goLabel = $<HTMLElement>("[data-go-label]");
+  const statusEl = $<HTMLElement>("[data-status]");
+  const out = (k: string) => $<HTMLElement>(`[data-out="${k}"]`);
+  const hudOut = (k: string) => $<HTMLElement>(`[data-hud="${k}"]`);
+
+  const STORE = "sens-tester:v1";
+  const fmt = (n: number, d = 2) => (Number.isFinite(n) ? n.toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: 0 }) : "–");
+  const rad = (d: number) => (d * Math.PI) / 180;
+
+  /* ---------- capability checks ---------- */
+  const finePointer = matchMedia("(pointer: fine)").matches;
+  const hasLock = "requestPointerLock" in HTMLElement.prototype;
+  const supported = finePointer && hasLock;
+  if (!supported) {
+    $<HTMLElement>("[data-unsupported]").hidden = false;
+    goBtn.disabled = true;
+    $<HTMLButtonElement>("[data-calib-start]").disabled = true;
+  }
+  const ff = /Firefox\/(\d+)/.exec(navigator.userAgent);
+  const chromium = /Chrome\/\d+/.test(navigator.userAgent) && !ff;
+
+  /* ---------- setup state ---------- */
+  interface Setup {
+    dpi: number;
+    sens: number;
+    gameW: number;
+    gameH: number;
+    monW: number;
+    monH: number;
+    scaling: Scaling;
+    correction: number; // browser count-scaling correction (1 = none)
+    correctionDpr: number; // the devicePixelRatio the correction was measured at
+  }
+  const detected = () => ({
+    monW: Math.round(screen.width * devicePixelRatio),
+    monH: Math.round(screen.height * devicePixelRatio),
+  });
+  const defaults = { ...JSON.parse(app.dataset.defaults!), ...detected(), correction: 1, correctionDpr: devicePixelRatio } as Setup;
+  let setup: Setup = defaults;
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (saved && typeof saved === "object") setup = { ...defaults, ...saved };
+  } catch {}
+  // a correction only holds at the display scaling it was measured at
+  if (Math.abs(setup.correctionDpr - devicePixelRatio) > 0.01) setup.correction = 1;
+
+  const fields = form.elements as unknown as Record<string, HTMLInputElement | HTMLSelectElement>;
+  for (const k of ["dpi", "sens", "gameW", "gameH", "monW", "monH", "scaling"] as const) fields[k].value = String(setup[k]);
+
+  const save = () => {
+    try {
+      localStorage.setItem(STORE, JSON.stringify(setup));
+    } catch {}
+  };
+
+  function readForm() {
+    const num = (k: string, fallback: number) => {
+      const v = parseFloat((fields[k] as HTMLInputElement).value);
+      return Number.isFinite(v) && v > 0 ? v : fallback;
+    };
+    setup = {
+      ...setup,
+      dpi: num("dpi", setup.dpi),
+      sens: num("sens", setup.sens),
+      gameW: Math.round(num("gameW", setup.gameW)),
+      gameH: Math.round(num("gameH", setup.gameH)),
+      monW: Math.round(num("monW", setup.monW)),
+      monH: Math.round(num("monH", setup.monH)),
+      scaling: fields.scaling.value as Scaling,
+    };
+    save();
+    applySetup();
+  }
+  form.addEventListener("input", (e) => {
+    const el = e.target as HTMLInputElement;
+    if (el.hasAttribute("data-calib-cm") || el.name === "mode") return;
+    readForm();
+  });
+  $<HTMLButtonElement>("[data-detect]").addEventListener("click", () => {
+    const d = detected();
+    fields.monW.value = String(d.monW);
+    fields.monH.value = String(d.monH);
+    readForm();
+  });
+
+  /* ---------- three.js scene: a plain grid room with angle posts ---------- */
+  const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(1); // we size the drawing buffer to the in-game resolution ourselves
+  renderer.outputColorSpace = SRGBColorSpace;
+  const scene = new Scene();
+  scene.background = new Color("#0b0a1f");
+  const camera = new PerspectiveCamera(VFOV, 16 / 9, 0.05, 200);
+  camera.rotation.order = "YXZ";
+  const EYE = 1.7;
+
+  function gridTexture() {
+    const s = 256;
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = s;
+    const g = cv.getContext("2d")!;
+    g.fillStyle = "#15123a";
+    g.fillRect(0, 0, s, s);
+    g.strokeStyle = "rgba(185,166,255,0.18)";
+    g.lineWidth = 2;
+    for (let i = 0; i <= 4; i++) {
+      const p = (i * s) / 4;
+      g.beginPath(); g.moveTo(p, 0); g.lineTo(p, s); g.stroke();
+      g.beginPath(); g.moveTo(0, p); g.lineTo(s, p); g.stroke();
+    }
+    g.strokeStyle = "rgba(185,166,255,0.42)";
+    g.lineWidth = 4;
+    g.strokeRect(0, 0, s, s);
+    const tex = new CanvasTexture(cv);
+    tex.colorSpace = SRGBColorSpace;
+    tex.wrapS = tex.wrapT = RepeatWrapping;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return tex;
+  }
+  {
+    // Room: a 40 m cylinder (every direction is equally far → fair flicks), eye height 1.7 m.
+    const R = 20, H = 10;
+    const wallTex = gridTexture();
+    wallTex.repeat.set(32, 4);
+    const wall = new Mesh(new CylinderGeometry(R, R, H, 128, 1, true), new MeshBasicMaterial({ map: wallTex, side: BackSide }));
+    wall.position.y = H / 2 - EYE;
+    scene.add(wall);
+    const floorTex = gridTexture();
+    floorTex.repeat.set(20, 20);
+    const floor = new Mesh(new CylinderGeometry(R, R, 0.02, 128), new MeshBasicMaterial({ map: floorTex }));
+    floor.position.y = -EYE;
+    scene.add(floor);
+    const ceil = floor.clone();
+    ceil.position.y = H - EYE;
+    scene.add(ceil);
+
+    // Angle posts every 10° at radius 12 (0° = red, every 90° = lilac, every 45° = cream).
+    const posts = new Group();
+    for (let a = 0; a < 360; a += 10) {
+      const major = a % 90 === 0;
+      const half = a % 45 === 0;
+      const color = a === 0 ? "#e8263b" : major ? "#b9a6ff" : half ? "#f5e6d3" : "#5b4fa0";
+      const hgt = a === 0 ? 3.4 : major ? 2.6 : half ? 2 : 1.2;
+      const post = new Mesh(new BoxGeometry(a === 0 ? 0.32 : 0.18, hgt, a === 0 ? 0.32 : 0.18), new MeshBasicMaterial({ color }));
+      const th = rad(a);
+      // camera looks down -Z at yaw 0; turning right (clockwise) increases the angle
+      post.position.set(Math.sin(th) * 12, hgt / 2 - EYE, -Math.cos(th) * 12);
+      posts.add(post);
+    }
+    scene.add(posts);
+  }
+
+  /* ---------- view: render at the in-game resolution, show it like the GPU does ---------- */
+  let vm = viewModel(setup);
+  function applySetup() {
+    vm = viewModel(setup);
+    out("edpi").textContent = fmt(eDPI(setup.dpi, setup.sens), 1);
+    out("cm360").textContent = `${fmt(cm360(setup.dpi, setup.sens), 1)} cm`;
+    out("dpc").textContent = `${fmt(degPerCount(setup.sens), 5)}°`;
+    out("fov").textContent = `${fmt(vm.hfov, 1)}° × ${fmt(vm.vfov, 1)}° (${setup.scaling === "native" ? aspectLabel(setup.monW, setup.monH) : aspectLabel(setup.gameW, setup.gameH)})`;
+    out("stretch").textContent = vm.hStretch > 1.001 ? `${fmt(vm.hStretch, 2)}× wider` : "none";
+    out("speed").textContent = `${fmt(vm.hSpeedVsNative, 2)}×`;
+
+    renderer.setSize(vm.renderW, vm.renderH, false);
+    camera.aspect = vm.renderAspect;
+    camera.fov = vm.vfov;
+    camera.updateProjectionMatrix();
+    layoutView();
+  }
+
+  /** Stretched fills the screen; black bars / native keep the image's own shape, centred. */
+  function layoutView() {
+    const box = app.getBoundingClientRect();
+    const share = setup.scaling === "stretched" ? 1 : Math.min(1, (box.height * vm.renderAspect) / box.width);
+    view.style.setProperty("--view-w", String(share));
+    // crosshair: drawn in game pixels, scaled with the image (stretched too)
+    const r = view.getBoundingClientRect();
+    const px = Number(xh.dataset.px);
+    xh.style.width = `${(px * r.width) / vm.renderW}px`;
+    xh.style.height = `${(px * r.height) / vm.renderH}px`;
+    draw();
+  }
+  new ResizeObserver(layoutView).observe(app);
+
+  /* ---------- mouse → view: exactly CS2's 0.022 × sens per count ---------- */
+  type RawStatus = "on" | "off" | "unknown";
+  let yaw = 0; // degrees, clockwise = turning right
+  let pitch = 0; // degrees, up = positive
+  let activeSens = setup.sens; // the sens being tested right now
+  let raw: RawStatus = "unknown";
+  let aiming = false;
+  let frame = 0;
+
+  const applyCamera = () => camera.rotation.set(rad(pitch), rad(-yaw), 0);
+  function draw() {
+    applyCamera();
+    renderer.render(scene, camera);
+  }
+  const loop = () => {
+    draw();
+    frame = aiming ? requestAnimationFrame(loop) : 0;
+  };
+
+  function onMove(e: MouseEvent) {
+    if (!aiming) return;
+    const k = setup.correction;
+    yaw += e.movementX * k * M_YAW * activeSens;
+    pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch - e.movementY * k * M_PITCH * activeSens));
+    hudOut("turn").textContent = `${fmt(yaw, 1)}°`;
+  }
+
+  /* ---------- targets ---------- */
+  const TARGET_DIST = 9; // metres
+  const target = new Mesh(new SphereGeometry(1, 32, 20), new MeshBasicMaterial({ color: "#ff5fa2" }));
+  target.visible = false;
+  scene.add(target);
+  let targetR = 0.3;
+  let spawnedAt = 0;
+  let spawnTimer = 0;
+
+  /** Small seeded PRNG, so A and B in a round get the identical target sequence. */
+  function mulberry32(seed: number) {
+    return () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  let rand = mulberry32(1);
+
+  function spawnTarget() {
+    // A flick of 8°–70° from where you're aiming, in a random direction, kept near eye level.
+    const d = 8 + rand() * 62;
+    const dir = rand() * Math.PI * 2;
+    const ty = yaw + Math.cos(dir) * d;
+    targetR = 0.22 + rand() * 0.14; // ~2.8°–4.6° wide at 9 m
+    // Keep the whole sphere above the floor (eye is 1.7 m up) with 30 cm to spare.
+    const minPitch = (Math.asin((-EYE + 0.3 + targetR) / TARGET_DIST) * 180) / Math.PI; // ≈ −6.5°
+    const tp = Math.max(minPitch, Math.min(20, pitch + Math.sin(dir) * d * 0.5));
+    const yr = rad(ty), pr = rad(tp);
+    target.position.set(Math.sin(yr) * Math.cos(pr) * TARGET_DIST, Math.sin(pr) * TARGET_DIST, -Math.cos(yr) * Math.cos(pr) * TARGET_DIST);
+    target.scale.setScalar(targetR);
+    target.visible = true;
+    spawnedAt = performance.now();
+  }
+
+  const fwd = new Vector3();
+  /** Ray from the eye through the crosshair vs. the target sphere. */
+  function aimHits() {
+    applyCamera();
+    camera.updateMatrixWorld();
+    fwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    const along = target.position.dot(fwd);
+    if (along <= 0) return false;
+    return target.position.lengthSq() - along * along <= targetR * targetR;
+  }
+
+  interface RunStats { shots: number; hits: number; times: number[] }
+  interface Run { stats: RunStats; total: number | null; onDone?: (s: RunStats) => void }
+  let run: Run | null = null;
+
+  const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+  const statLine = (s: RunStats) =>
+    `${s.hits} hits · ${s.shots ? Math.round((s.hits / s.shots) * 100) : 0}% accuracy · ${fmt(avg(s.times) / 1000, 2)} s per target`;
+
+  function startRun(sens: number, total: number | null, seed: number, onDone?: (s: RunStats) => void) {
+    clearTimeout(spawnTimer);
+    activeSens = sens;
+    rand = mulberry32(seed);
+    run = { stats: { shots: 0, hits: 0, times: [] }, total, onDone };
+    target.visible = false;
+    spawnTimer = window.setTimeout(() => run && spawnTarget(), 600);
+    updateTaskHud();
+  }
+  function stopRun() {
+    clearTimeout(spawnTimer);
+    run = null;
+    target.visible = false;
+  }
+
+  function updateTaskHud() {
+    const el = hudOut("task");
+    if (!run) return (el.textContent = "");
+    const s = run.stats;
+    if (mode === "finder") el.textContent = `Round ${finder.round} of ${ROUNDS} · Sens ${finder.current} · ${s.hits}/${TARGETS}`;
+    else el.textContent = statLine(s);
+  }
+
+  let hitTimer = 0;
+  function showHitMarker() {
+    hitEl.classList.add("is-on");
+    clearTimeout(hitTimer);
+    hitTimer = window.setTimeout(() => hitEl.classList.remove("is-on"), 130);
+  }
+
+  function shoot() {
+    if (!run || !target.visible) return;
+    run.stats.shots++;
+    if (aimHits()) {
+      run.stats.hits++;
+      run.stats.times.push(performance.now() - spawnedAt);
+      target.visible = false;
+      showHitMarker();
+      if (run.total !== null && run.stats.hits >= run.total) {
+        const done = run.onDone;
+        const stats = run.stats;
+        run = null;
+        updateTaskHud();
+        done?.(stats);
+        return;
+      }
+      spawnTimer = window.setTimeout(() => run && spawnTarget(), 140);
+    }
+    updateTaskHud();
+  }
+
+  let bannerTimer = 0;
+  function showBanner(title: string, text: string, ms = 1600) {
+    $<HTMLElement>("[data-banner-title]").textContent = title;
+    $<HTMLElement>("[data-banner-text]").textContent = text;
+    banner.hidden = false;
+    clearTimeout(bannerTimer);
+    if (ms) bannerTimer = window.setTimeout(() => (banner.hidden = true), ms);
+  }
+
+  /* ---------- modes & the sensitivity finder ---------- */
+  type Mode = "free" | "finder";
+  type Side = "A" | "B";
+  type Phase = "idle" | "A" | "between" | "B" | "choose" | "done";
+  const ROUNDS = 7;
+  const TARGETS = 12;
+  let mode: Mode = "free";
+  const finder = {
+    phase: "idle" as Phase,
+    base: 0,
+    low: 0,
+    high: 0,
+    round: 0,
+    current: "A" as Side,
+    ab: { A: 0, B: 0 } as Record<Side, number>,
+    stats: {} as Partial<Record<Side, RunStats>>,
+    seed: 1,
+    history: [] as { round: number; A: number; B: number; picked: Side }[],
+  };
+  const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+  function finderReset() {
+    finder.phase = "idle";
+    finder.history = [];
+  }
+  function finderBegin() {
+    finder.base = setup.sens;
+    finder.low = setup.sens * 0.5;
+    finder.high = setup.sens * 1.5;
+    finder.round = 1;
+    finder.history = [];
+    newRound();
+  }
+  function newRound() {
+    // which of A/B is the lower sens is random each round (blind test)
+    const lowFirst = Math.random() < 0.5;
+    finder.ab = lowFirst ? { A: finder.low, B: finder.high } : { A: finder.high, B: finder.low };
+    finder.seed = (Math.random() * 2 ** 31) | 0;
+    finder.stats = {};
+    finder.phase = "A";
+  }
+  function startTest(side: Side) {
+    finder.phase = side;
+    finder.current = side;
+    showBanner(`Round ${finder.round} of ${ROUNDS} · Sens ${side}`, `Shoot ${TARGETS} targets`);
+    startRun(finder.ab[side], TARGETS, finder.seed, (s) => endTest(side, s));
+  }
+  function endTest(side: Side, s: RunStats) {
+    finder.stats[side] = s;
+    if (side === "A") {
+      finder.phase = "between";
+      showBanner("Sens A done", "Click to start Sens B", 0);
+    } else {
+      finder.phase = "choose";
+      banner.hidden = true;
+      document.exitPointerLock(); // → menu shows the A/B choice
+    }
+  }
+  function pick(side: Side) {
+    const chosen = finder.ab[side];
+    finder.history.push({ round: finder.round, A: finder.ab.A, B: finder.ab.B, picked: side });
+    const mid = (finder.low + finder.high) / 2;
+    if (chosen === finder.low) finder.high = mid;
+    else finder.low = mid;
+    finder.round++;
+    if (finder.round > ROUNDS) {
+      finder.phase = "done";
+      renderPanel();
+      return;
+    }
+    newRound();
+    renderPanel();
+    go(); // this click starts the next round
+  }
+  const finderResult = () => Math.round(((finder.low + finder.high) / 2) * 100) / 100;
+
+  function renderPanel() {
+    const box = $<HTMLElement>("[data-finder]");
+    box.hidden = mode !== "finder";
+    const show = (sel: string, on: boolean) => ($<HTMLElement>(sel).hidden = !on);
+    const p = finder.phase;
+    show("[data-finder-intro]", p === "idle");
+    show("[data-finder-choice]", p === "choose");
+    show("[data-finder-done]", p === "done");
+    goRow.hidden = mode === "finder" && (p === "choose" || p === "done");
+
+    if (mode === "free") goLabel.textContent = "Go";
+    else if (p === "idle") goLabel.textContent = "Start finder";
+    else goLabel.textContent = "Resume";
+
+    if (mode === "finder" && (p === "A" || p === "B" || p === "between"))
+      status(`Paused in round ${finder.round} of ${ROUNDS}. Resume restarts the current test.`);
+
+    if (p === "choose") {
+      $<HTMLElement>("[data-choice-title]").textContent = `Round ${finder.round} of ${ROUNDS}: which felt better?`;
+      $<HTMLElement>('[data-stats="A"]').textContent = finder.stats.A ? statLine(finder.stats.A) : "";
+      $<HTMLElement>('[data-stats="B"]').textContent = finder.stats.B ? statLine(finder.stats.B) : "";
+      $<HTMLButtonElement>('[data-pick="A"]').focus({ preventScroll: true });
+    }
+    if (p === "done") {
+      const res = finderResult();
+      $<HTMLElement>("[data-result]").textContent = String(res);
+      $<HTMLElement>("[data-result-meta]").textContent = `eDPI ${fmt(eDPI(setup.dpi, res), 0)} · ${fmt(cm360(setup.dpi, res), 1)} cm/360 at ${setup.dpi} DPI`;
+      $<HTMLElement>("[data-result-cmd]").textContent = `sensitivity ${res}`;
+      $<HTMLElement>("[data-history]").innerHTML = finder.history
+        .map((r) => `<tr><td>${r.round}</td><td>${r3(r.A)}</td><td>${r3(r.B)}</td><td>${r.picked} (${r3(r.picked === "A" ? r.A : r.B)})</td></tr>`)
+        .join("");
+      $<HTMLButtonElement>("[data-copy-result]").focus({ preventScroll: true });
+    }
+  }
+
+  form.querySelectorAll<HTMLInputElement>('input[name="mode"]').forEach((r) =>
+    r.addEventListener("change", () => {
+      mode = r.value as Mode;
+      finderReset();
+      status("");
+      renderPanel();
+    }),
+  );
+  form.querySelectorAll<HTMLButtonElement>("[data-pick]").forEach((b) => b.addEventListener("click", () => pick(b.dataset.pick as Side)));
+  $<HTMLButtonElement>("[data-replay]").addEventListener("click", () => {
+    finder.stats = {};
+    finder.phase = "A";
+    renderPanel();
+    go();
+  });
+  $<HTMLButtonElement>("[data-restart]").addEventListener("click", () => {
+    finderReset();
+    renderPanel();
+  });
+  $<HTMLButtonElement>("[data-try-result]").addEventListener("click", () => {
+    fields.sens.value = String(finderResult());
+    readForm();
+    (form.querySelector('input[name="mode"][value="free"]') as HTMLInputElement).checked = true;
+    mode = "free";
+    finderReset();
+    renderPanel();
+    status(`Sensitivity set to ${finderResult()}. Press Go to try it.`);
+    goBtn.focus({ preventScroll: true });
+  });
+  $<HTMLButtonElement>("[data-copy-result]").addEventListener("click", async () => {
+    const cmd = `sensitivity ${finderResult()}`;
+    let ok = true;
+    try {
+      await navigator.clipboard.writeText(cmd);
+    } catch {
+      ok = false;
+    }
+    (window as unknown as { toast?: (m: string) => void }).toast?.(ok ? `Copied: ${cmd}` : "Couldn't copy: select it manually");
+  });
+
+  /* ---------- pointer lock ---------- */
+  /** Pointer lock with raw input when the browser supports it. Resolves to the raw status. */
+  async function lockPointer(el: HTMLElement): Promise<RawStatus> {
+    try {
+      const p = (el.requestPointerLock as (o?: { unadjustedMovement?: boolean }) => Promise<void> | void)({ unadjustedMovement: true });
+      if (p && typeof (p as Promise<void>).then === "function") await p;
+      // Old Firefox ignored the option silently, so raw input can't be confirmed there.
+      if (ff && Number(ff[1]) < 152) return "unknown";
+      return p ? "on" : "unknown";
+    } catch (err) {
+      if ((err as DOMException)?.name === "NotSupportedError") {
+        const p2 = (el.requestPointerLock as () => Promise<void> | void)();
+        if (p2 && typeof (p2 as Promise<void>).then === "function") await p2;
+        return "off";
+      }
+      throw err;
+    }
+  }
+
+  const RAW_TEXT: Record<RawStatus, string> = {
+    on: "Raw input: on. Mouse acceleration is bypassed, just like in CS2.",
+    off: "Raw input isn't available in this browser, so Windows' pointer settings apply. Turn off \"Enhance pointer precision\" or use Chrome / Edge / Firefox 152+.",
+    unknown: "Raw input couldn't be confirmed in this browser. For a guaranteed 1-to-1, use Chrome, Edge or Firefox 152+.",
+  };
+  function status(msg: string) {
+    statusEl.textContent = msg;
+  }
+
+  /* ---------- Go: fullscreen + mouse capture (both need this click) ---------- */
+  let busy = false;
+  let windowMode = false;
+  async function go() {
+    if (busy || !supported) return;
+    busy = true;
+    readForm();
+    if (mode === "finder" && (finder.phase === "idle" || finder.phase === "done")) finderBegin();
+    if (!document.fullscreenElement) {
+      try {
+        await app.requestFullscreen({ navigationUI: "hide" });
+        windowMode = false;
+      } catch {
+        windowMode = true; // still works, but the view can't match the monitor 1-to-1
+      }
+    }
+    // Chrome / Edge: keep Esc for ourselves, so one press opens settings and holding it leaves fullscreen.
+    const kb = (navigator as Navigator & { keyboard?: { lock?: (keys: string[]) => Promise<void> } }).keyboard;
+    if (document.fullscreenElement && kb?.lock) kb.lock(["Escape"]).catch(() => {});
+    try {
+      raw = await lockPointer(canvas);
+    } catch {
+      // Chrome refuses to re-capture the mouse for ~1 s after Esc
+      goBtn.disabled = true;
+      status("One moment…");
+      setTimeout(() => {
+        goBtn.disabled = false;
+        status("Ready: press Go again.");
+        goBtn.focus();
+      }, 1200);
+    }
+    busy = false;
+  }
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    go();
+  });
+
+  /** Called when the mouse gets captured: start whatever comes next. */
+  function onLocked() {
+    status("");
+    if (mode === "free") {
+      showBanner("Free aim", "Click to shoot", 1400);
+      startRun(setup.sens, null, (Math.random() * 2 ** 31) | 0);
+    } else if (finder.phase === "A" || finder.phase === "B") {
+      startTest(finder.phase);
+    } else if (finder.phase === "between") {
+      activeSens = finder.ab.B;
+      showBanner("Sens A done", "Click to start Sens B", 0);
+    }
+  }
+  function openMenu() {
+    stopRun();
+    banner.hidden = true;
+    menu.hidden = false;
+    hud.hidden = true;
+    renderPanel();
+    if (!(mode === "finder" && finder.phase !== "idle" && finder.phase !== "done")) {
+      status(raw === "unknown" && !ff && !chromium ? RAW_TEXT.unknown : raw !== "unknown" ? RAW_TEXT[raw] : "");
+    }
+    if (!goRow.hidden) goBtn.focus({ preventScroll: true });
+  }
+
+  document.addEventListener("pointerlockchange", () => {
+    const now = document.pointerLockElement;
+    if (now === canvas) {
+      aiming = true;
+      menu.hidden = true;
+      hud.hidden = false;
+      hudOut("raw").textContent = raw === "on" ? "raw input" : raw === "off" ? "accelerated input" : "raw input unconfirmed";
+      hudOut("window").hidden = !windowMode;
+      document.addEventListener("mousemove", onMove);
+      if (!frame) frame = requestAnimationFrame(loop);
+      onLocked();
+    } else if (aiming) {
+      aiming = false;
+      document.removeEventListener("mousemove", onMove);
+      openMenu();
+    }
+    if (now === calibPad) calibActive();
+    else if (calibRunning) calibFinish();
+  });
+
+  // Shooting (and "click to start Sens B")
+  document.addEventListener("mousedown", (e) => {
+    if (!aiming || e.button !== 0) return;
+    if (mode === "finder" && finder.phase === "between") {
+      startTest("B");
+      return;
+    }
+    shoot();
+  });
+
+  // With Keyboard Lock (Chrome / Edge), Esc reaches the page instead of the browser.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.pointerLockElement === canvas) {
+      e.preventDefault();
+      document.exitPointerLock();
+    }
+  });
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) {
+      const kb = (navigator as Navigator & { keyboard?: { unlock?: () => void } }).keyboard;
+      kb?.unlock?.();
+      if (document.pointerLockElement) document.exitPointerLock();
+    }
+    requestAnimationFrame(layoutView);
+  });
+
+  /* ---------- calibration: does the browser report real mouse counts? ---------- */
+  const calibPad = $<HTMLElement>("[data-calib-pad]");
+  const calibLive = $<HTMLElement>("[data-calib-live]");
+  const calibResult = $<HTMLElement>("[data-calib-result]");
+  const calibCm = $<HTMLInputElement>("[data-calib-cm]");
+  let calibRunning = false;
+  let calibRaw: RawStatus = "unknown";
+  let sumX = 0;
+  let sumY = 0;
+
+  function onCalibMove(e: MouseEvent) {
+    sumX += e.movementX;
+    sumY += e.movementY;
+    calibLive.textContent = `Moving… ${Math.abs(sumX).toLocaleString("en-US")} counts. Click when you reach the mark.`;
+  }
+  function calibActive() {
+    calibRunning = true;
+    sumX = sumY = 0;
+    calibPad.classList.add("is-active");
+    document.addEventListener("mousemove", onCalibMove);
+    document.addEventListener("mousedown", stopCalib, { once: true });
+  }
+  function stopCalib() {
+    document.exitPointerLock();
+  }
+  function calibFinish() {
+    calibRunning = false;
+    document.removeEventListener("mousemove", onCalibMove);
+    calibPad.classList.remove("is-active");
+    const cm = parseFloat(calibCm.value) || 10;
+    const measured = Math.abs(sumX);
+    const expected = (setup.dpi * cm) / 2.54;
+    if (measured < expected * 0.2) {
+      calibResult.textContent = "Too little movement to measure. Try again and slide the full distance.";
+      return;
+    }
+    const ratio = measured / expected;
+    const dpr = devicePixelRatio;
+    const drift = Math.abs(sumY) / measured;
+    const off = (ratio - 1) * 100;
+    const pct = `${off >= 0.05 ? "+" : off <= -0.05 ? "−" : ""}${Math.abs(off).toFixed(1)}%`;
+    const realDpi = Math.round((measured * 2.54) / cm);
+    let msg: string;
+    if (Math.abs(ratio - 1) <= 0.05) {
+      setup.correction = 1;
+      msg = `<b>1-to-1 confirmed.</b> ${measured.toLocaleString("en-US")} counts over ${cm} cm (expected ${Math.round(expected).toLocaleString("en-US")} at ${setup.dpi} DPI, ${pct}). The browser passes your mouse through untouched.`;
+    } else if (dpr !== 1 && Math.abs(ratio - dpr) / dpr <= 0.05) {
+      setup.correction = 1 / dpr;
+      msg = `<b>Fixed:</b> this browser multiplies mouse movement by your display scaling (×${dpr}). The tester now corrects for it, so turning is 1-to-1 again.`;
+    } else {
+      setup.correction = 1;
+      msg = `<b>${pct} from what ${setup.dpi} DPI predicts</b> (your mouse measured about ${realDpi.toLocaleString("en-US")} DPI). Mice often differ from their rated DPI by a few percent. CS2 sees the same mouse, so nothing is changed here.${calibRaw !== "on" ? " If it's far off, mouse acceleration may be on: turn off \"Enhance pointer precision\" in Windows, or use Chrome / Edge / Firefox 152+." : ""}`;
+    }
+    if (drift > 0.08) msg += " (Your line drifted up/down a bit; a straighter slide gives a cleaner reading.)";
+    setup.correctionDpr = dpr;
+    save();
+    calibResult.innerHTML = msg;
+  }
+  $<HTMLButtonElement>("[data-calib-start]").addEventListener("click", async () => {
+    calibResult.textContent = "";
+    try {
+      calibRaw = await lockPointer(calibPad);
+    } catch {
+      calibResult.textContent = "Couldn't capture the mouse. Wait a second and try again.";
+    }
+  });
+
+  // Dev-only test hook (stripped from production builds): where the target is, where we aim.
+  if (import.meta.env.DEV) {
+    (window as unknown as Record<string, unknown>).__sensTest = () => {
+      const p = target.position;
+      return {
+        visible: target.visible,
+        y: p.y,
+        r: target.scale.x,
+        floorY: -EYE,
+        targetYaw: (Math.atan2(p.x, -p.z) * 180) / Math.PI,
+        targetPitch: (Math.asin(p.y / p.length()) * 180) / Math.PI,
+        yaw,
+        pitch,
+        activeSens,
+        phase: finder.phase,
+        round: finder.round,
+        ab: { ...finder.ab },
+        low: finder.low,
+        high: finder.high,
+      };
+    };
+  }
+
+  applySetup();
+  renderPanel();
+  if (supported && ff && Number(ff[1]) < 152) status(RAW_TEXT.unknown);
+  goBtn.focus({ preventScroll: true });
+</script>

@@ -7,9 +7,13 @@ import Icon from "./Icon.astro";
 
 interface Props {
   handle: string;
-  items: { href: string; label: string }[];
+  /** href is "#section" on the home page, or a page path like "/sens" */
+  items: { href: string; label: string; current?: boolean }[];
+  /** prefix for home-page anchors when this nav is shown on another page (e.g. "/") */
+  home?: string;
 }
-const { handle, items } = Astro.props;
+const { handle, items, home = "" } = Astro.props;
+const link = (href: string) => (href.startsWith("#") ? `${home}${href}` : href);
 
 // Split "metron1x" → "metron" + "1x" so the suffix can be red, like the wordmark.
 const m = /^(.*?)(1x)$/i.exec(handle);
@@ -18,7 +22,7 @@ const [head, tail] = m ? [m[1], m[2]] : [handle, ""];
 
 <header class="nav" data-nav>
   <nav class="nav__inner container" aria-label="Primary">
-    <a class="nav__brand display" href="#top" aria-label={`${handle} — back to top`}>
+    <a class="nav__brand display" href={link("#top")} aria-label={`${handle} — back to top`}>
       {head}<span class="nav__brand-x">{tail}</span>
     </a>
 
@@ -30,7 +34,11 @@ const [head, tail] = m ? [m[1], m[2]] : [handle, ""];
 
     <ul class="nav__menu" id="nav-menu" data-nav-menu>
       {items.map((it) => (
-        <li><a class="nav__link" href={it.href}>{it.label}</a></li>
+        <li>
+          <a class:list={["nav__link", { "is-active": it.current }]} href={link(it.href)} aria-current={it.current ? "page" : undefined}>
+            {it.label}
+          </a>
+        </li>
       ))}
     </ul>
   </nav>
