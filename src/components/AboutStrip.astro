@@ -95,14 +95,20 @@ const lines = [bio ?? []].flat().filter((l) => l.trim());
   }
   .about__sep { color: var(--moon-red); }
   /* the two short lines under the role */
+  /* the pledge: first line bold as the headline, the rest read like verse */
   .about__lines {
-    margin-top: 14px;
+    margin-top: 16px;
     display: grid;
-    gap: 4px;
-    font-size: clamp(1rem, 1.4vw, 1.125rem);
-    line-height: 1.5;
+    gap: 2px;
+    font-size: clamp(1.0625rem, 1.8vw, 1.375rem);
+    line-height: 1.45;
     color: var(--text);
     text-shadow: 0 1px 12px rgba(10, 11, 34, 0.85);
+  }
+  .about__lines p:first-child {
+    margin-bottom: 4px;
+    font-weight: 600;
+    color: var(--cream);
   }
   .about__lines p { text-wrap: balance; } /* even line lengths when a line wraps */
   .about__role-part { white-space: nowrap; }

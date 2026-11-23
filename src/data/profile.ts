@@ -23,8 +23,10 @@ export const profile: Profile = {
   role: "Full-time developer · Part-time gamer",
   // Short lines shown under the role in the About section (one per line).
   bio: [
-    "I help turn software ideas into products people actually use.",
-    "I play CS for fun and for the clips.",
+    "Coder by day, gamer by night,", // first line is shown bold, as the headline
+    "Shipping features when the deadline's tight,",
+    "Shipping clips when the aim feels right.",
+    "Both get pushed before midnight.",
   ],
   avatar: "https://avatars.fastly.steamstatic.com/77df7851b64f84e1639cadab4db4a72ac8996b62_full.jpg",
   steamId64: "76561197961132406",
