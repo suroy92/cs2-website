@@ -11,7 +11,9 @@
  *  - Sensitivity finder: the "Perfect Sensitivity Approach". 7 blind A/B
  *    rounds between a low and a high sens (start: 50% and 150% of yours);
  *    the one you prefer keeps its side and the range halves each round.
- *    A and B in a round use the identical (seeded) target sequence.
+ *    A and B in a round use the identical (seeded) target sequence, and
+ *    every test starts facing the red post (0°) after a 3-2-1 countdown.
+ *    Free aim also starts facing the red post on every Go.
  *
  * Turns exactly like CS2: one mouse count = 0.022 × sensitivity degrees,
  * raw input (Pointer Lock `unadjustedMovement`), CS2's fixed 73.74° vertical
@@ -127,8 +129,9 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
             <h2 class="app__h">How the finder works</h2>
             <p class="app__text">
               Each round you shoot 12 targets with <b>Sens A</b>, then the same 12 with <b>Sens B</b>, and pick the one
-              that <em>felt</em> better. Which one is lower stays hidden until the end. It starts at half and one and a
-              half times your sensitivity below, and the gap halves every round. 7 rounds, about 4 minutes.
+              that <em>felt</em> better. Every test starts facing the red post after a 3-second countdown. Which one is
+              lower stays hidden until the end. It starts at half and one and a half times your sensitivity below, and
+              the gap halves every round. 7 rounds, about 5 minutes.
             </p>
           </div>
 
@@ -209,6 +212,14 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
                   <button class="btn btn--ghost btn--sm" type="button" data-detect>Detect</button>
                 </div>
               </fieldset>
+              <div class="app__field app__field--wide">
+                <span id="hitvol-label">Hit sound</span>
+                <div class="app__pair app__sound">
+                  <input name="hitVolume" type="range" min="0" max="100" step="5" aria-labelledby="hitvol-label" />
+                  <output class="app__sound-val" data-hitvol-out>50%</output>
+                  <button class="btn btn--ghost btn--sm" type="button" data-hitvol-test>Test</button>
+                </div>
+              </div>
             </div>
             <p class="app__note">Prefilled with {profile.handle}'s settings. Saved in this browser only.</p>
           </fieldset>
@@ -349,6 +360,9 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   }
   .app__banner[hidden] { display: none; }
   .app__banner b { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.75rem; color: var(--cream); }
+  /* countdown: a big 3 / 2 / 1 */
+  .app__banner.is-count { padding: 10px 28px 14px; }
+  .app__banner.is-count b { font-size: 4.5rem; line-height: 1; color: var(--moon-red); }
   .app__banner span { font-family: var(--font-value); font-weight: 600; }
 
   /* ---------- settings panel ---------- */
@@ -526,6 +540,24 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   .app__pair { display: flex; align-items: center; gap: 8px; }
   .app__pair > span { color: var(--text-muted); }
   .app__pair .btn { flex: none; }
+  /* hit sound volume */
+  .app__sound input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    accent-color: var(--moon-red);
+  }
+  .app__sound-val {
+    flex: none;
+    min-width: 3.2em;
+    text-align: right;
+    font-family: var(--font-value);
+    font-weight: 600;
+    color: var(--cream);
+  }
   .app__note { margin-top: 10px; font-size: 0.8125rem; color: var(--text-muted); }
 
   .app__stats { margin: 0; display: grid; }
@@ -612,6 +644,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     WebGLRenderer,
   } from "three";
   import { M_YAW, M_PITCH, PITCH_LIMIT, VFOV, cm360, eDPI, degPerCount, viewModel, aspectLabel, type Scaling } from "../lib/sens";
+  import hitSoundUrl from "../assets/sfx/hit.mp3?url";
 
   const $ = <T extends Element>(sel: string) => document.querySelector<T>(sel)!;
   const app = $<HTMLElement>("[data-app]");
@@ -657,12 +690,13 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     scaling: Scaling;
     correction: number; // browser count-scaling correction (1 = none)
     correctionDpr: number; // the devicePixelRatio the correction was measured at
+    hitVolume: number; // 0–100, 0 = off
   }
   const detected = () => ({
     monW: Math.round(screen.width * devicePixelRatio),
     monH: Math.round(screen.height * devicePixelRatio),
   });
-  const defaults = { ...JSON.parse(app.dataset.defaults!), ...detected(), correction: 1, correctionDpr: devicePixelRatio } as Setup;
+  const defaults = { ...JSON.parse(app.dataset.defaults!), ...detected(), correction: 1, correctionDpr: devicePixelRatio, hitVolume: 50 } as Setup;
   let setup: Setup = defaults;
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || "null");
@@ -672,7 +706,10 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   if (Math.abs(setup.correctionDpr - devicePixelRatio) > 0.01) setup.correction = 1;
 
   const fields = form.elements as unknown as Record<string, HTMLInputElement | HTMLSelectElement>;
-  for (const k of ["dpi", "sens", "gameW", "gameH", "monW", "monH", "scaling"] as const) fields[k].value = String(setup[k]);
+  for (const k of ["dpi", "sens", "gameW", "gameH", "monW", "monH", "scaling", "hitVolume"] as const) fields[k].value = String(setup[k]);
+  const hitVolOut = $<HTMLOutputElement>("[data-hitvol-out]");
+  const showVolume = () => (hitVolOut.textContent = setup.hitVolume > 0 ? `${setup.hitVolume}%` : "Off");
+  showVolume();
 
   const save = () => {
     try {
@@ -694,7 +731,10 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
       monW: Math.round(num("monW", setup.monW)),
       monH: Math.round(num("monH", setup.monH)),
       scaling: fields.scaling.value as Scaling,
+      hitVolume: Math.max(0, Math.min(100, Math.round(Number(fields.hitVolume.value) || 0))),
     };
+    showVolume();
+    setGain();
     save();
     applySetup();
   }
@@ -828,7 +868,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   };
 
   function onMove(e: MouseEvent) {
-    if (!aiming) return;
+    if (!aiming || frozen) return; // view is held during the countdown
     const k = setup.correction;
     yaw += e.movementX * k * M_YAW * activeSens;
     pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch - e.movementY * k * M_PITCH * activeSens));
@@ -855,17 +895,70 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   }
   let rand = mulberry32(1);
 
+  const CEIL_Y = 10 - EYE; // room is 10 m tall, eye at 1.7 m
+  const spawnDir = new Vector3();
+
+  /** Height band for targets, in degrees above / below eye level (≈ chest to just over head height at 9 m). */
+  const ELEV_MIN = -6;
+  const ELEV_MAX = 7;
+
+  /**
+   * New target ON SCREEN, CS-style: mostly a sideways flick (20–85% of the
+   * way from the crosshair to the left / right screen edge) with a small
+   * vertical offset, kept within ELEV_MIN…ELEV_MAX of eye level. If you're
+   * aiming far up / down, it stays on screen rather than in the band. The
+   * point is picked relative to your view, so A and B in a finder round get
+   * identical flicks for the same field of view.
+   */
   function spawnTarget() {
-    // A flick of 8°–70° from where you're aiming, in a random direction, kept near eye level.
-    const d = 8 + rand() * 62;
-    const dir = rand() * Math.PI * 2;
-    const ty = yaw + Math.cos(dir) * d;
-    targetR = 0.22 + rand() * 0.14; // ~2.8°–4.6° wide at 9 m
-    // Keep the whole sphere above the floor (eye is 1.7 m up) with 30 cm to spare.
-    const minPitch = (Math.asin((-EYE + 0.3 + targetR) / TARGET_DIST) * 180) / Math.PI; // ≈ −6.5°
-    const tp = Math.max(minPitch, Math.min(20, pitch + Math.sin(dir) * d * 0.5));
-    const yr = rad(ty), pr = rad(tp);
-    target.position.set(Math.sin(yr) * Math.cos(pr) * TARGET_DIST, Math.sin(pr) * TARGET_DIST, -Math.cos(yr) * Math.cos(pr) * TARGET_DIST);
+    banner.hidden = true; // never let the start banner cover a target
+    const baseR = 0.22 + rand() * 0.14; // radius at 9 m: ~2.8°–4.6° wide
+    const side = rand() < 0.5 ? -1 : 1;
+    const nx = side * (0.2 + rand() * 0.65); // sideways: fraction of the way to the screen edge
+    let ny = (rand() * 2 - 1) * 0.25; // a little up / down
+    applyCamera();
+    camera.updateMatrixWorld();
+
+    // Keep it near eye level by sliding it up / down the screen (never off it):
+    // find the screen height where its elevation falls inside the band. Moving up
+    // the screen always raises the elevation, so a short binary search does it.
+    const elevAt = (y: number) => {
+      spawnDir.set(nx, y, 0.5).unproject(camera).normalize();
+      return (Math.asin(spawnDir.y) * 180) / Math.PI;
+    };
+    const e0 = elevAt(ny);
+    if (e0 < ELEV_MIN || e0 > ELEV_MAX) {
+      // bounce back into the band (rather than piling up on its edge)
+      const bounced = e0 > ELEV_MAX ? ELEV_MAX - (e0 - ELEV_MAX) : ELEV_MIN + (ELEV_MIN - e0);
+      const goal = Math.max(ELEV_MIN, Math.min(ELEV_MAX, bounced));
+      let lo = -0.85, hi = 0.85;
+      if (elevAt(hi) < goal) ny = hi; // aiming far down: band is above the screen → top edge
+      else if (elevAt(lo) > goal) ny = lo; // aiming far up: band is below → bottom edge
+      else {
+        for (let i = 0; i < 24; i++) {
+          const m = (lo + hi) / 2;
+          if (elevAt(m) < goal) lo = m;
+          else hi = m;
+        }
+        ny = (lo + hi) / 2;
+      }
+    }
+    // normalised screen point → world direction (camera sits at the origin)
+    spawnDir.set(nx, ny, 0.5).unproject(camera).normalize();
+
+    // Normally 9 m away. Looking steeply down or up, bring it closer along the same
+    // line of sight so it stays 30 cm clear of the floor / ceiling; its size scales
+    // with distance, so it looks the same on screen.
+    const k = baseR / TARGET_DIST; // radius per metre of distance
+    let dist = TARGET_DIST;
+    const floorGap = -EYE + 0.3; // lowest allowed bottom of the sphere
+    const ceilGap = CEIL_Y - 0.3;
+    if (spawnDir.y - k < 0) dist = Math.min(dist, floorGap / (spawnDir.y - k));
+    if (spawnDir.y + k > 0) dist = Math.min(dist, ceilGap / (spawnDir.y + k));
+    dist = Math.max(1.2, dist);
+
+    targetR = k * dist;
+    target.position.copy(spawnDir).multiplyScalar(dist);
     target.scale.setScalar(targetR);
     target.visible = true;
     spawnedAt = performance.now();
@@ -890,19 +983,57 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   const statLine = (s: RunStats) =>
     `${s.hits} hits · ${s.shots ? Math.round((s.hits / s.shots) * 100) : 0}% accuracy · ${fmt(avg(s.times) / 1000, 2)} s per target`;
 
-  function startRun(sens: number, total: number | null, seed: number, onDone?: (s: RunStats) => void) {
+  function startRun(sens: number, total: number | null, seed: number, onDone?: (s: RunStats) => void, firstDelay = 600) {
     clearTimeout(spawnTimer);
     activeSens = sens;
     rand = mulberry32(seed);
     run = { stats: { shots: 0, hits: 0, times: [] }, total, onDone };
     target.visible = false;
-    spawnTimer = window.setTimeout(() => run && spawnTarget(), 600);
+    spawnTimer = window.setTimeout(() => run && spawnTarget(), firstDelay);
     updateTaskHud();
   }
   function stopRun() {
     clearTimeout(spawnTimer);
+    cancelCountdown();
     run = null;
     target.visible = false;
+  }
+
+  /** Point of origin: face the red post (0°), level. */
+  function resetView() {
+    yaw = 0;
+    pitch = 0;
+    hudOut("turn").textContent = "0.0°";
+    draw();
+  }
+
+  /* ---------- 3-2-1 countdown (view held still, like freeze time) ---------- */
+  const COUNTDOWN = 3;
+  let countdownTimer = 0;
+  let frozen = false;
+  function countdown(label: string, then: () => void) {
+    cancelCountdown();
+    frozen = true;
+    banner.classList.add("is-count");
+    let n = COUNTDOWN;
+    const tick = () => {
+      if (n > 0) {
+        showBanner(String(n), label, 0);
+        n--;
+      } else {
+        cancelCountdown();
+        then();
+      }
+    };
+    tick();
+    countdownTimer = window.setInterval(tick, 1000);
+  }
+  function cancelCountdown() {
+    clearInterval(countdownTimer);
+    countdownTimer = 0;
+    frozen = false;
+    banner.classList.remove("is-count");
+    banner.hidden = true;
   }
 
   function updateTaskHud() {
@@ -912,6 +1043,58 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     if (mode === "finder") el.textContent = `Round ${finder.round} of ${ROUNDS} · Sens ${finder.current} · ${s.hits}/${TARGETS}`;
     else el.textContent = statLine(s);
   }
+
+  /* ---------- hit sound (Web Audio: decoded once, near-zero latency, hits can overlap) ---------- */
+  let audioCtx: AudioContext | null = null;
+  let hitGain: GainNode | null = null;
+  let hitBuffer: AudioBuffer | null = null;
+  let hitOffset = 0; // seconds of leading silence to skip (MP3 padding)
+  let audioLoading: Promise<void> | null = null;
+
+  /** First moment the sound is actually audible (5% of its peak), minus 2 ms. */
+  function soundStart(buf: AudioBuffer) {
+    const ch = buf.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < ch.length; i++) peak = Math.max(peak, Math.abs(ch[i]));
+    let i = 0;
+    while (i < ch.length && Math.abs(ch[i]) < peak * 0.05) i++;
+    return Math.max(0, i / buf.sampleRate - 0.002);
+  }
+  function setGain() {
+    if (hitGain) hitGain.gain.value = (setup.hitVolume / 100) ** 2; // squared = feels linear to the ear
+  }
+  /** Must start from a click (browsers block audio until the user interacts). */
+  function initAudio() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return Promise.resolve();
+      audioCtx = new AC({ latencyHint: "interactive" });
+      hitGain = audioCtx.createGain();
+      hitGain.connect(audioCtx.destination);
+      setGain();
+    }
+    if (audioCtx.state === "suspended") audioCtx.resume().catch(() => {});
+    audioLoading ??= fetch(hitSoundUrl)
+      .then((r) => r.arrayBuffer())
+      .then((data) => audioCtx!.decodeAudioData(data))
+      .then((buf) => {
+        hitBuffer = buf;
+        hitOffset = soundStart(buf);
+      })
+      .catch(() => {}); // no sound is fine; never block aiming
+    return audioLoading;
+  }
+  function playHit() {
+    if (!audioCtx || !hitGain || !hitBuffer || setup.hitVolume <= 0) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = hitBuffer;
+    src.connect(hitGain);
+    src.start(0, hitOffset);
+  }
+  $<HTMLButtonElement>("[data-hitvol-test]").addEventListener("click", async () => {
+    await initAudio();
+    playHit();
+  });
 
   let hitTimer = 0;
   function showHitMarker() {
@@ -928,6 +1111,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
       run.stats.times.push(performance.now() - spawnedAt);
       target.visible = false;
       showHitMarker();
+      playHit();
       if (run.total !== null && run.stats.hits >= run.total) {
         const done = run.onDone;
         const stats = run.stats;
@@ -953,7 +1137,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   /* ---------- modes & the sensitivity finder ---------- */
   type Mode = "free" | "finder";
   type Side = "A" | "B";
-  type Phase = "idle" | "A" | "between" | "B" | "choose" | "done";
+  type Phase = "idle" | "A" | "B" | "choose" | "done";
   const ROUNDS = 7;
   const TARGETS = 12;
   let mode: Mode = "free";
@@ -991,17 +1175,23 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     finder.stats = {};
     finder.phase = "A";
   }
+  /** Every test starts from the point of origin after a 3-second countdown. */
   function startTest(side: Side) {
+    stopRun();
     finder.phase = side;
     finder.current = side;
-    showBanner(`Round ${finder.round} of ${ROUNDS} · Sens ${side}`, `Shoot ${TARGETS} targets`);
-    startRun(finder.ab[side], TARGETS, finder.seed, (s) => endTest(side, s));
+    activeSens = finder.ab[side];
+    resetView();
+    updateTaskHud();
+    hudOut("task").textContent = `Round ${finder.round} of ${ROUNDS} · Sens ${side} · get ready`;
+    countdown(`Round ${finder.round} of ${ROUNDS} · Sens ${side} · ${TARGETS} targets`, () =>
+      startRun(finder.ab[side], TARGETS, finder.seed, (s) => endTest(side, s), 0),
+    );
   }
   function endTest(side: Side, s: RunStats) {
     finder.stats[side] = s;
     if (side === "A") {
-      finder.phase = "between";
-      showBanner("Sens A done", "Click to start Sens B", 0);
+      startTest("B"); // resets the view and counts down again
     } else {
       finder.phase = "choose";
       banner.hidden = true;
@@ -1040,7 +1230,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     else if (p === "idle") goLabel.textContent = "Start finder";
     else goLabel.textContent = "Resume";
 
-    if (mode === "finder" && (p === "A" || p === "B" || p === "between"))
+    if (mode === "finder" && (p === "A" || p === "B"))
       status(`Paused in round ${finder.round} of ${ROUNDS}. Resume restarts the current test.`);
 
     if (p === "choose") {
@@ -1134,6 +1324,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   let windowMode = false;
   async function go() {
     if (busy || !supported) return;
+    initAudio(); // browsers only allow audio after a click: this one counts
     busy = true;
     readForm();
     if (mode === "finder" && (finder.phase === "idle" || finder.phase === "done")) finderBegin();
@@ -1171,13 +1362,11 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   function onLocked() {
     status("");
     if (mode === "free") {
+      resetView(); // every Go starts facing the red post
       showBanner("Free aim", "Click to shoot", 1400);
       startRun(setup.sens, null, (Math.random() * 2 ** 31) | 0);
     } else if (finder.phase === "A" || finder.phase === "B") {
       startTest(finder.phase);
-    } else if (finder.phase === "between") {
-      activeSens = finder.ab.B;
-      showBanner("Sens A done", "Click to start Sens B", 0);
     }
   }
   function openMenu() {
@@ -1212,13 +1401,9 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     else if (calibRunning) calibFinish();
   });
 
-  // Shooting (and "click to start Sens B")
+  // Shooting (ignored during the countdown)
   document.addEventListener("mousedown", (e) => {
-    if (!aiming || e.button !== 0) return;
-    if (mode === "finder" && finder.phase === "between") {
-      startTest("B");
-      return;
-    }
+    if (!aiming || frozen || e.button !== 0) return;
     shoot();
   });
 
@@ -1316,6 +1501,13 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
         floorY: -EYE,
         targetYaw: (Math.atan2(p.x, -p.z) * 180) / Math.PI,
         targetPitch: (Math.asin(p.y / p.length()) * 180) / Math.PI,
+        // where the target sits on screen right now (-1…1 = inside the view)
+        screen: (() => {
+          applyCamera();
+          camera.updateMatrixWorld();
+          const v = p.clone().project(camera);
+          return { x: v.x, y: v.y, inFront: v.z < 1 };
+        })(),
         yaw,
         pitch,
         activeSens,
