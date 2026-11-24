@@ -23,8 +23,23 @@
  */
 import Base from "../layouts/Base.astro";
 import Icon from "../components/Icon.astro";
-import { profile } from "../lib/content";
+import { profile, getAutoexec } from "../lib/content";
 import { videoCfg } from "../lib/video";
+
+// Pistol placement from the owner's autoexec (CS2 defaults if a line is missing).
+const cfg = getAutoexec();
+const cvar = (name: string, fallback: number) => {
+  const m = new RegExp(`^\\s*${name}\\s+"?(-?[\\d.]+)`, "m").exec(cfg);
+  const v = m ? Number(m[1]) : NaN;
+  return Number.isFinite(v) ? v : fallback;
+};
+const viewmodel = {
+  fov: cvar("viewmodel_fov", 68),
+  x: cvar("viewmodel_offset_x", 1),
+  y: cvar("viewmodel_offset_y", 1),
+  z: cvar("viewmodel_offset_z", -1),
+  left: /^\s*cl_prefer_lefthanded\s+"?(true|1)\b/m.test(cfg),
+};
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 
@@ -63,7 +78,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   description="Test and find your CS2 sensitivity in the browser, 1-to-1: same turn per mouse count, same field of view, same stretched or black-bars view."
   petals={false}
 >
-  <main id="main" class="app" data-app data-defaults={JSON.stringify(defaults)}>
+  <main id="main" class="app" data-app data-defaults={JSON.stringify(defaults)} data-viewmodel={JSON.stringify(viewmodel)}>
     <!-- ---------- the room ---------- -->
     <div class="app__view" data-view>
       <canvas class="app__canvas" data-canvas></canvas>
@@ -680,6 +695,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   } from "three";
   import { M_YAW, M_PITCH, PITCH_LIMIT, VFOV, cm360, eDPI, degPerCount, viewModel, aspectLabel, type Scaling } from "../lib/sens";
   import hitSoundUrl from "../assets/sfx/hit.mp3?url";
+  import { createViewmodel } from "../lib/viewmodel";
 
   const $ = <T extends Element>(sel: string) => document.querySelector<T>(sel)!;
   const app = $<HTMLElement>("[data-app]");
@@ -794,6 +810,8 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   const camera = new PerspectiveCamera(VFOV, 16 / 9, 0.05, 200);
   camera.rotation.order = "YXZ";
   const EYE = 1.7;
+  // the pistol: its own scene + camera, drawn over the room (see lib/viewmodel.ts)
+  const pistol = createViewmodel(JSON.parse(app.dataset.viewmodel!));
 
   function gridTexture() {
     const s = 256;
@@ -866,6 +884,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     camera.aspect = vm.renderAspect;
     camera.fov = vm.vfov;
     camera.updateProjectionMatrix();
+    pistol.setAspect(vm.renderAspect);
     layoutView();
   }
 
@@ -896,6 +915,12 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   function draw() {
     applyCamera();
     renderer.render(scene, camera);
+    // pistol on top: clear depth so it never sinks into the room
+    pistol.update();
+    renderer.autoClear = false;
+    renderer.clearDepth();
+    renderer.render(pistol.scene, pistol.camera);
+    renderer.autoClear = true;
   }
   const loop = () => {
     draw();
@@ -1638,6 +1663,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   // Shooting (ignored during the countdown)
   document.addEventListener("mousedown", (e) => {
     if (!aiming || frozen || e.button !== 0) return;
+    pistol.kick(); // visual only: no aim punch
     shoot();
   });
 
