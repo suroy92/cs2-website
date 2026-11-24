@@ -12,7 +12,7 @@
  *    rounds between a low and a high sens (start: 50% and 150% of yours);
  *    the one you prefer keeps its side and the range halves each round.
  *    A and B in a round use the identical (seeded) target sequence, and
- *    every test starts facing the red post (0°) after a 3-2-1 countdown.
+ *    every test starts facing the red post (0°) after a 5-second countdown.
  *    Free aim also starts facing the red post on every Go.
  *
  * Turns exactly like CS2: one mouse count = 0.022 × sensitivity degrees,
@@ -129,7 +129,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
             <h2 class="app__h">How the finder works</h2>
             <p class="app__text">
               Each round you shoot 12 targets with <b>Sens A</b>, then the same 12 with <b>Sens B</b>, and pick the one
-              that <em>felt</em> better. Every test starts facing the red post after a 3-second countdown. Which one is
+              that <em>felt</em> better. Every test starts facing the red post after a 5-second countdown. Which one is
               lower stays hidden until the end. It starts at half and one and a half times your sensitivity below, and
               the gap halves every round. 7 rounds, about 5 minutes.
             </p>
@@ -138,17 +138,27 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
           <div data-finder-choice hidden>
             <h2 class="app__h" data-choice-title>Which felt better?</h2>
             <div class="app__ab">
-              <div class="app__ab-card">
-                <p class="app__ab-name">Sens A</p>
-                <p class="app__ab-stats" data-stats="A"></p>
-                <button class="btn btn--primary" type="button" data-pick="A">A felt better</button>
-              </div>
-              <div class="app__ab-card">
-                <p class="app__ab-name">Sens B</p>
-                <p class="app__ab-stats" data-stats="B"></p>
-                <button class="btn btn--primary" type="button" data-pick="B">B felt better</button>
-              </div>
+              {(["A", "B"] as const).map((s) => (
+                <div class="app__ab-card">
+                  <p class="app__ab-name">Sens {s}</p>
+                  <p class="app__ab-stats" data-stats={s}></p>
+                  <div class="app__radar" data-radar={s}></div>
+                  <p class="app__ab-flick" data-flick={s}></p>
+                  <button class="btn btn--primary" type="button" data-pick={s}>{s} felt better</button>
+                </div>
+              ))}
             </div>
+            <details class="app__how">
+              <summary>How the chart is scored</summary>
+              <p>
+                Every axis is 0–100, further out is better. Your first flick to each target is the fast movement before
+                the small fix-ups: <b>Flick accuracy</b> is how close it lands to the target's centre (overflicking and
+                underflicking both count against it), <b>Consistency</b> is how similar that is from target to target,
+                <b>Straightness</b> is how little it drifts sideways, and <b>Smoothness</b> is how little correcting you
+                needed after it. <b>Speed</b> is the time per target and <b>Hit rate</b> is hits out of shots. The dashed
+                outline is the other sens, for comparison.
+              </p>
+            </details>
             <p class="app__ab-foot">
               The numbers are a hint: go with what felt more controlled.
               <button class="app__link" type="button" data-replay>Replay this round</button>
@@ -158,6 +168,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
           <div data-finder-done hidden>
             <h2 class="app__h">Your sensitivity</h2>
             <p class="app__result"><span data-result>–</span><small data-result-meta></small></p>
+            <p class="app__flickmatch" data-flickmatch hidden></p>
             <div class="app__result-actions">
               <button class="btn btn--primary" type="button" data-copy-result>
                 <Icon name="copy" size={18} /> Copy <code data-result-cmd></code>
@@ -360,7 +371,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   }
   .app__banner[hidden] { display: none; }
   .app__banner b { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.75rem; color: var(--cream); }
-  /* countdown: a big 3 / 2 / 1 */
+  /* countdown: a big 5 … 1 */
   .app__banner.is-count { padding: 10px 28px 14px; }
   .app__banner.is-count b { font-size: 4.5rem; line-height: 1; color: var(--moon-red); }
   .app__banner span { font-family: var(--font-value); font-weight: 600; }
@@ -465,6 +476,30 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   .app__ab-name { font-family: var(--font-display); font-style: italic; font-weight: 800; font-size: 1.5rem; color: var(--cream); }
   .app__ab-stats { font-family: var(--font-value); font-weight: 600; font-size: 0.875rem; color: var(--text); }
   .app__ab-foot { margin-top: 10px; font-size: 0.8125rem; color: var(--text-muted); }
+  .app__ab-card { --c-A: #937bec; --c-B: #e06a22; }
+  /* radar chart (drawn by script) */
+  .app__radar { width: 100%; }
+  .app__radar:empty { display: none; }
+  .app__radar :global(svg) { display: block; width: 100%; max-width: 330px; height: auto; margin: 0 auto; overflow: visible; }
+  .app__radar :global(.rd-ring) { fill: none; stroke: rgba(185, 166, 255, 0.16); stroke-width: 1; }
+  .app__radar :global(.rd-ring--outer) { stroke: rgba(185, 166, 255, 0.32); }
+  .app__radar :global(.rd-label) { font-family: var(--font-body); font-size: 11px; font-weight: 500; fill: var(--text-muted); }
+  .app__radar :global(.rd-own) { fill-opacity: 0.22; stroke-width: 2; stroke-linejoin: round; }
+  .app__radar :global(.rd-ghost) { fill: none; stroke-width: 1.5; stroke-dasharray: 4 3; stroke-linejoin: round; opacity: 0.85; }
+  .app__radar :global(.rd-dot) { stroke: #14123a; stroke-width: 2; }
+  .app__radar :global(.rd-hit) { fill: transparent; cursor: help; }
+  .app__radar :global(.rd-legend) { display: flex; justify-content: center; gap: 14px; margin-top: 2px; font-size: 0.75rem; color: var(--text-muted); }
+  .app__radar :global(.rd-legend i) { display: inline-block; width: 16px; height: 0; margin-right: 6px; vertical-align: middle; border-top: 2px solid var(--c); }
+  .app__radar :global(.rd-legend i.is-ghost) { border-top-style: dashed; }
+  .app__ab-flick { font-size: 0.8125rem; color: var(--text); }
+  .app__ab-flick:empty { display: none; }
+  .app__ab-flick b { font-family: var(--font-value); font-weight: 600; color: var(--cream); }
+  .app__how { margin-top: 10px; font-size: 0.8125rem; color: var(--text-muted); }
+  .app__how summary { cursor: pointer; color: var(--lilac); }
+  .app__how p { margin-top: 6px; max-width: 70ch; }
+  .app__how b { color: var(--text); font-weight: 600; }
+  .app__flickmatch { margin-top: 10px; font-size: 0.875rem; color: var(--text-muted); max-width: 70ch; }
+  .app__flickmatch b { font-family: var(--font-value); font-weight: 600; color: var(--cream); }
   .app__link {
     margin-left: 6px;
     padding: 0;
@@ -873,11 +908,12 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     yaw += e.movementX * k * M_YAW * activeSens;
     pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch - e.movementY * k * M_PITCH * activeSens));
     hudOut("turn").textContent = `${fmt(yaw, 1)}°`;
+    if (track) track.s.push(e.timeStamp, yaw, pitch);
   }
 
   /* ---------- targets ---------- */
   const TARGET_DIST = 9; // metres
-  const target = new Mesh(new SphereGeometry(1, 32, 20), new MeshBasicMaterial({ color: "#ff5fa2" }));
+  const target = new Mesh(new SphereGeometry(1, 32, 20), new MeshBasicMaterial({ color: "#ff1a1a" }));
   target.visible = false;
   scene.add(target);
   let targetR = 0.3;
@@ -962,6 +998,164 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     target.scale.setScalar(targetR);
     target.visible = true;
     spawnedAt = performance.now();
+
+    // start recording the aim path for the flick analysis (angles, in the same space as yaw / pitch)
+    const tYaw = (Math.atan2(target.position.x, -target.position.z) * 180) / Math.PI;
+    const tPitch = (Math.asin(target.position.y / target.position.length()) * 180) / Math.PI;
+    track = { t0: spawnedAt, y0: yaw, p0: pitch, dx: ((((tYaw - yaw) % 360) + 540) % 360) - 180, dy: tPitch - pitch, s: [] };
+  }
+
+  /* ---------- flick analysis: did the first flick overshoot or stop short? ---------- */
+  /** Aim path for the current target: start aim, offset to the target centre (degrees), samples [t, yaw, pitch, …]. */
+  interface Track { t0: number; y0: number; p0: number; dx: number; dy: number; s: number[] }
+  interface Flick {
+    over: number; // where the first flick stopped, along the line to the target: +8 = 8% past it, −7 = 7% short
+    side: number; // sideways drift at that point, % of the flick distance
+    corr: number; // aim movement after the flick until the hit, % of the flick distance
+    dist: number; // flick distance, degrees
+  }
+  let track: Track | null = null;
+
+  const MIN_FLICK = 2; // degrees: anything smaller is too short to read over / under
+  const SPEED_WINDOW = 16; // ms: speeds are measured over this window (smooths 1000 Hz+ mice)
+  const STOP_GAP = 50; // ms without any movement = the hand stopped
+
+  /**
+   * Splits the path into the first fast flick and the fix-ups after it: the flick
+   * ends at the first point after peak speed where the speed falls below 15% of
+   * the peak, the aim starts moving back, or the mouse goes still.
+   */
+  function analyseFlick(tr: Track): Flick | null {
+    const L = Math.hypot(tr.dx, tr.dy);
+    if (L < MIN_FLICK || tr.s.length < 6) return null;
+    const t = [tr.t0], a = [0], q = [0]; // time, fraction along the line, sideways (deg)
+    for (let i = 0; i < tr.s.length; i += 3) {
+      const ux = tr.s[i + 1] - tr.y0, uy = tr.s[i + 2] - tr.p0;
+      t.push(tr.s[i]);
+      a.push((ux * tr.dx + uy * tr.dy) / (L * L));
+      q.push((ux * tr.dy - uy * tr.dx) / L);
+    }
+    const n = t.length;
+    const v = new Array<number>(n).fill(0); // speed, deg/s
+    const va = new Array<number>(n).fill(0); // speed towards the target, deg/s
+    for (let i = 1, j = 0; i < n; i++) {
+      while (j < i - 1 && t[i] - t[j + 1] >= SPEED_WINDOW) j++;
+      const dt = (t[i] - t[j]) / 1000;
+      if (dt <= 0) continue;
+      va[i] = ((a[i] - a[j]) * L) / dt;
+      v[i] = Math.hypot((a[i] - a[j]) * L, q[i] - q[j]) / dt;
+    }
+    // The FIRST fast movement is the flick, even when a fix-up after a big undershoot is faster:
+    // the first point above 30% of the top speed, then on up to that movement's own peak.
+    let top = 0;
+    for (let i = 1; i < n; i++) top = Math.max(top, v[i]);
+    if (top < 20) return null; // a slow drag, not a flick
+    let peak = 1;
+    while (peak < n - 1 && v[peak] < top * 0.3) peak++;
+    while (peak < n - 1 && v[peak + 1] >= v[peak] && t[peak + 1] - t[peak] <= STOP_GAP) peak++;
+    let end = n - 1;
+    for (let i = peak + 1; i < n; i++) {
+      if (t[i] - t[i - 1] > STOP_GAP) { end = i - 1; break; }
+      if (v[i] < v[peak] * 0.15 || va[i] <= 0) { end = i; break; }
+    }
+    // the furthest point reached during the flick is where it landed
+    let land = peak;
+    for (let i = peak; i <= end; i++) if (a[i] > a[land]) land = i;
+    let after = 0;
+    for (let i = land + 1; i < n; i++) after += Math.hypot((a[i] - a[i - 1]) * L, q[i] - q[i - 1]);
+    return {
+      over: Math.max(-100, Math.min(100, (a[land] - 1) * 100)),
+      side: (Math.abs(q[land]) / L) * 100,
+      corr: (after / L) * 100,
+      dist: L,
+    };
+  }
+
+  interface Summary {
+    n: number; // flicks measured
+    overMean: number;
+    overSd: number;
+    absMean: number;
+    side: number;
+    corr: number;
+    time: number; // s per target
+    hitRate: number; // 0–1
+  }
+  function summarise(s: RunStats): Summary {
+    const f = s.flicks;
+    const overs = f.map((x) => x.over);
+    const m = avg(overs);
+    return {
+      n: f.length,
+      overMean: m,
+      overSd: Math.sqrt(avg(overs.map((o) => (o - m) ** 2))),
+      absMean: avg(overs.map(Math.abs)),
+      side: avg(f.map((x) => x.side)),
+      corr: avg(f.map((x) => x.corr)),
+      time: avg(s.times) / 1000,
+      hitRate: s.shots ? s.hits / s.shots : 0,
+    };
+  }
+
+  /* ---------- radar chart: 6 scores, 0–100, further out = better ---------- */
+  /** 100 at `good`, 0 at `bad`, straight line between. */
+  const score = (v: number, good: number, bad: number) => Math.round(100 * Math.max(0, Math.min(1, (v - bad) / (good - bad))));
+  const AXES: { label: string; score: (m: Summary) => number; detail: (m: Summary) => string; flick?: boolean }[] = [
+    { label: "Flick accuracy", flick: true, score: (m) => score(m.absMean, 0, 30), detail: (m) => `first flick lands ${fmt(m.absMean, 1)}% off target on average` },
+    { label: "Consistency", flick: true, score: (m) => score(m.overSd, 0, 25), detail: (m) => `±${fmt(m.overSd, 1)}% spread from flick to flick` },
+    { label: "Straightness", flick: true, score: (m) => score(m.side, 0, 15), detail: (m) => `drifts ${fmt(m.side, 1)}% to the side` },
+    { label: "Smoothness", flick: true, score: (m) => score(m.corr, 0, 60), detail: (m) => `${fmt(m.corr, 0)}% extra movement to finish` },
+    { label: "Speed", score: (m) => score(m.time, 0.35, 1.5), detail: (m) => `${fmt(m.time, 2)} s per target` },
+    { label: "Hit rate", score: (m) => score(m.hitRate, 1, 0.4), detail: (m) => `${Math.round(m.hitRate * 100)}% of shots hit` },
+  ];
+  const MIN_FLICKS = 3; // fewer measured flicks than this: flick axes read 0
+  const scoresOf = (m: Summary) => AXES.map((ax) => (ax.flick && m.n < MIN_FLICKS ? 0 : ax.score(m)));
+
+  function radarSvg(own: Side, sums: Partial<Record<Side, Summary>>) {
+    const other: Side = own === "A" ? "B" : "A";
+    const mine = sums[own];
+    if (!mine) return "";
+    const W = 330, H = 218, cx = 165, cy = 107, R = 78;
+    const ang = (k: number) => rad(-90 + (360 / AXES.length) * k);
+    const pt = (k: number, v: number) => [cx + ((R * v) / 100) * Math.cos(ang(k)), cy + ((R * v) / 100) * Math.sin(ang(k))];
+    const poly = (vals: number[]) => vals.map((v, k) => pt(k, Math.max(v, 2)).map((n) => n.toFixed(1)).join(",")).join(" ");
+    const col = (s: Side) => `var(--c-${s})`;
+
+    let g = "";
+    for (const lvl of [25, 50, 75, 100]) g += `<polygon class="rd-ring${lvl === 100 ? " rd-ring--outer" : ""}" points="${poly(AXES.map(() => lvl))}"/>`;
+    AXES.forEach((ax, k) => {
+      const [x, y] = pt(k, 100);
+      g += `<line class="rd-ring" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+      const c = Math.cos(ang(k)), s = Math.sin(ang(k));
+      const [lx, ly] = [cx + (R + 10) * c, cy + (R + 10) * s];
+      const anchor = c > 0.3 ? "start" : c < -0.3 ? "end" : "middle";
+      const dy = s < -0.5 ? -3 : s > 0.5 ? 11 : 4;
+      g += `<text class="rd-label" x="${lx.toFixed(1)}" y="${(ly + dy).toFixed(1)}" text-anchor="${anchor}">${ax.label}</text>`;
+    });
+    const theirs = sums[other];
+    if (theirs) g += `<polygon class="rd-ghost" stroke="${col(other)}" points="${poly(scoresOf(theirs))}"/>`;
+    const vals = scoresOf(mine);
+    g += `<polygon class="rd-own" fill="${col(own)}" stroke="${col(own)}" points="${poly(vals)}"/>`;
+    vals.forEach((v, k) => {
+      const [x, y] = pt(k, Math.max(v, 2));
+      const ax = AXES[k];
+      const why = ax.flick && mine.n < MIN_FLICKS ? "not enough flicks measured" : ax.detail(mine);
+      g += `<circle class="rd-dot" fill="${col(own)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5"/>`;
+      g += `<circle class="rd-hit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12"><title>Sens ${own} · ${ax.label}: ${v}/100 (${why})</title></circle>`;
+    });
+    const desc = AXES.map((ax, k) => `${ax.label} ${vals[k]}`).join(", ");
+    const legend = `<p class="rd-legend"><span><i style="--c:${col(own)}"></i>Sens ${own}</span>${
+      theirs ? `<span><i class="is-ghost" style="--c:${col(other)}"></i>Sens ${other}</span>` : ""
+    }</p>`;
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sens ${own} scores out of 100: ${desc}">${g}</svg>${legend}`;
+  }
+
+  /** "Flicks overshoot by 8% on average" — the direction the radar can't show. */
+  function flickLine(m: Summary) {
+    if (m.n < MIN_FLICKS) return "Not enough flicks to read over / under.";
+    const pct = Math.abs(m.overMean);
+    if (pct < 3) return `Flicks land <b>on target</b> on average (${m.n} measured)`;
+    return `Flicks <b>${m.overMean > 0 ? "overshoot" : "stop short"} by ${fmt(pct, 0)}%</b> on average (${m.n} measured)`;
   }
 
   const fwd = new Vector3();
@@ -975,7 +1169,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     return target.position.lengthSq() - along * along <= targetR * targetR;
   }
 
-  interface RunStats { shots: number; hits: number; times: number[] }
+  interface RunStats { shots: number; hits: number; times: number[]; flicks: Flick[] }
   interface Run { stats: RunStats; total: number | null; onDone?: (s: RunStats) => void }
   let run: Run | null = null;
 
@@ -987,7 +1181,8 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     clearTimeout(spawnTimer);
     activeSens = sens;
     rand = mulberry32(seed);
-    run = { stats: { shots: 0, hits: 0, times: [] }, total, onDone };
+    run = { stats: { shots: 0, hits: 0, times: [], flicks: [] }, total, onDone };
+    track = null;
     target.visible = false;
     spawnTimer = window.setTimeout(() => run && spawnTarget(), firstDelay);
     updateTaskHud();
@@ -996,6 +1191,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     clearTimeout(spawnTimer);
     cancelCountdown();
     run = null;
+    track = null;
     target.visible = false;
   }
 
@@ -1007,8 +1203,8 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     draw();
   }
 
-  /* ---------- 3-2-1 countdown (view held still, like freeze time) ---------- */
-  const COUNTDOWN = 3;
+  /* ---------- 5-4-3-2-1 countdown (view held still, like freeze time) ---------- */
+  const COUNTDOWN = 5;
   let countdownTimer = 0;
   let frozen = false;
   function countdown(label: string, then: () => void) {
@@ -1109,6 +1305,9 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     if (aimHits()) {
       run.stats.hits++;
       run.stats.times.push(performance.now() - spawnedAt);
+      const f = track && analyseFlick(track);
+      if (f) run.stats.flicks.push(f);
+      track = null;
       target.visible = false;
       showHitMarker();
       playHit();
@@ -1152,7 +1351,27 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     stats: {} as Partial<Record<Side, RunStats>>,
     seed: 1,
     history: [] as { round: number; A: number; B: number; picked: Side }[],
+    flickLog: [] as { sens: number; over: number }[], // every finished test's average over / under
   };
+
+  /**
+   * Flick-match estimate: fit a line through (sens, average over/under) for every
+   * test and find where it crosses 0 (flicks land on target). Only shown when
+   * higher sens really did overshoot more, and the answer is inside the tested range.
+   */
+  function flickMatch() {
+    const pts = finder.flickLog;
+    if (pts.length < 6) return null;
+    const mx = avg(pts.map((p) => p.sens)), my = avg(pts.map((p) => p.over));
+    let sxx = 0, sxy = 0;
+    for (const p of pts) { sxx += (p.sens - mx) ** 2; sxy += (p.sens - mx) * (p.over - my); }
+    if (sxx <= 0) return null;
+    const b = sxy / sxx;
+    if (b <= 0) return null;
+    const s0 = mx - my / b;
+    const lo = Math.min(...pts.map((p) => p.sens)), hi = Math.max(...pts.map((p) => p.sens));
+    return s0 >= lo && s0 <= hi ? Math.round(s0 * 100) / 100 : null;
+  }
   const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
   function finderReset() {
@@ -1165,6 +1384,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     finder.high = setup.sens * 1.5;
     finder.round = 1;
     finder.history = [];
+    finder.flickLog = [];
     newRound();
   }
   function newRound() {
@@ -1175,7 +1395,7 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
     finder.stats = {};
     finder.phase = "A";
   }
-  /** Every test starts from the point of origin after a 3-second countdown. */
+  /** Every test starts from the point of origin after a 5-second countdown. */
   function startTest(side: Side) {
     stopRun();
     finder.phase = side;
@@ -1201,6 +1421,10 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
   function pick(side: Side) {
     const chosen = finder.ab[side];
     finder.history.push({ round: finder.round, A: finder.ab.A, B: finder.ab.B, picked: side });
+    for (const s of ["A", "B"] as const) {
+      const st = finder.stats[s];
+      if (st && st.flicks.length >= MIN_FLICKS) finder.flickLog.push({ sens: finder.ab[s], over: summarise(st).overMean });
+    }
     const mid = (finder.low + finder.high) / 2;
     if (chosen === finder.low) finder.high = mid;
     else finder.low = mid;
@@ -1235,8 +1459,13 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
 
     if (p === "choose") {
       $<HTMLElement>("[data-choice-title]").textContent = `Round ${finder.round} of ${ROUNDS}: which felt better?`;
-      $<HTMLElement>('[data-stats="A"]').textContent = finder.stats.A ? statLine(finder.stats.A) : "";
-      $<HTMLElement>('[data-stats="B"]').textContent = finder.stats.B ? statLine(finder.stats.B) : "";
+      const sums: Partial<Record<Side, Summary>> = {};
+      for (const s of ["A", "B"] as const) if (finder.stats[s]) sums[s] = summarise(finder.stats[s]!);
+      for (const s of ["A", "B"] as const) {
+        $<HTMLElement>(`[data-stats="${s}"]`).textContent = finder.stats[s] ? statLine(finder.stats[s]!) : "";
+        $<HTMLElement>(`[data-radar="${s}"]`).innerHTML = radarSvg(s, sums);
+        $<HTMLElement>(`[data-flick="${s}"]`).innerHTML = sums[s] ? flickLine(sums[s]!) : "";
+      }
       $<HTMLButtonElement>('[data-pick="A"]').focus({ preventScroll: true });
     }
     if (p === "done") {
@@ -1244,6 +1473,11 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
       $<HTMLElement>("[data-result]").textContent = String(res);
       $<HTMLElement>("[data-result-meta]").textContent = `eDPI ${fmt(eDPI(setup.dpi, res), 0)} · ${fmt(cm360(setup.dpi, res), 1)} cm/360 at ${setup.dpi} DPI`;
       $<HTMLElement>("[data-result-cmd]").textContent = `sensitivity ${res}`;
+      const fm = flickMatch();
+      const fmEl = $<HTMLElement>("[data-flickmatch]");
+      fmEl.hidden = fm === null;
+      if (fm !== null)
+        fmEl.innerHTML = `Flick-match estimate: <b>${fm}</b>. That's where your first flicks would land right on target, from how much you over- and underflicked at each sens you tried. A second opinion: if what you picked felt better, trust that.`;
       $<HTMLElement>("[data-history]").innerHTML = finder.history
         .map((r) => `<tr><td>${r.round}</td><td>${r3(r.A)}</td><td>${r3(r.B)}</td><td>${r.picked} (${r3(r.picked === "A" ? r.A : r.B)})</td></tr>`)
         .join("");
@@ -1516,6 +1750,10 @@ const xOpacity = Math.min(1, Math.max(0, c.alpha / 255));
         ab: { ...finder.ab },
         low: finder.low,
         high: finder.high,
+        flicks: run ? [...run.stats.flicks] : null,
+        finderStats: finder.stats,
+        flickLog: finder.flickLog,
+        flickMatch: flickMatch(),
       };
     };
   }
